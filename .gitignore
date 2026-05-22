@@ -1,0 +1,29 @@
+# Python/cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime outputs
+plans/
+artifacts/
+outputs/
+packets/
+scratch/
+tmp/
+
+# Large/generated data
+*.h5ad
+*.h5
+*.h5mu
+*.bam
+*.bai
+*.fastq
+*.fastq.gz
+*.mtx
+*.mtx.gz
+*.tar
+*.tar.gz
+
+# Local config
+config/local.env
+AGENTS.local.md

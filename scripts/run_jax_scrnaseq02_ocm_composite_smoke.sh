@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+STAR_SUITE_ROOT="${STAR_SUITE_ROOT:-/mnt/pikachu/STAR-suite}"
 
 RAW_DIR="${RAW_DIR:-/mnt/pikachu/JAX_scRNAseq02/raw}"
 CONFIG="${CONFIG:-/mnt/pikachu/JAX_scRNAseq02/cellranger-logs/config.csv}"
@@ -12,7 +13,7 @@ SAMPLE_STEM="${SAMPLE_STEM:-25E32-L3_GT25-03394_ACCTCGAGCT-ATCGAACACA_S44}"
 LANES="${LANES:-L007,L008}"
 READ_PAIRS="${READ_PAIRS:-100000}"
 THREADS="${THREADS:-16}"
-STAR_BIN="${STAR_BIN:-${REPO_ROOT}/core/legacy/source/STAR}"
+STAR_BIN="${STAR_BIN:-${STAR_SUITE_ROOT}/core/legacy/source/STAR}"
 GENOME_DIR="${GENOME_DIR:-/storage/autoindex_110_44/bulk_index}"
 SOLO_CB_WHITELIST="${SOLO_CB_WHITELIST:-/storage/scRNAseq_output/whitelists/3M-3pgex-may-2023_TRU.txt}"
 STAR_OCM_BARCODE_MODE="${STAR_OCM_BARCODE_MODE:-flex}"

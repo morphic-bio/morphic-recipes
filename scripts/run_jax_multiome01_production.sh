@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+STAR_SUITE_ROOT="${STAR_SUITE_ROOT:-/mnt/pikachu/STAR-suite}"
 SMOKE_RUNNER="${REPO_ROOT}/scripts/run_star_multiome_lane_smoke.sh"
 REMOTE_POST_MEX="${REPO_ROOT}/scripts/run_remote_multiome_post_mex_rsync.sh"
 GLOBUS_UPLOADER="${REPO_ROOT}/scripts/upload_jax_multiome01_large_files_globus.sh"
@@ -73,6 +74,9 @@ Options:
   --start-at SAMPLE_LABEL_OR_SLUG
   --samples CSV_LABELS_OR_SLUGS
   --help
+
+Environment:
+  STAR_SUITE_ROOT           STAR-suite checkout containing core/ (default: /mnt/pikachu/STAR-suite)
 EOF
 }
 
@@ -222,9 +226,9 @@ fi
 
 if [[ "${SKIP_BUILD}" != "1" ]]; then
   log "Clean rebuilding STAR with Chromap support once for production"
-  make -C "${REPO_ROOT}/core/legacy/source" clean > "${OUTPUT_ROOT}/logs/build_clean.log" 2>&1
-  make -C "${REPO_ROOT}/core/legacy/source" -j8 STAR WITH_CHROMAP=1 > "${OUTPUT_ROOT}/logs/build_star_with_chromap.log" 2>&1
-  make -C "${REPO_ROOT}/core/features/libchromap_contract" star_multiome_atac_peak_mex > "${OUTPUT_ROOT}/logs/build_star_multiome_atac_peak_mex.log" 2>&1
+  make -C "${STAR_SUITE_ROOT}/core/legacy/source" clean > "${OUTPUT_ROOT}/logs/build_clean.log" 2>&1
+  make -C "${STAR_SUITE_ROOT}/core/legacy/source" -j8 STAR WITH_CHROMAP=1 > "${OUTPUT_ROOT}/logs/build_star_with_chromap.log" 2>&1
+  make -C "${STAR_SUITE_ROOT}/core/features/libchromap_contract" star_multiome_atac_peak_mex > "${OUTPUT_ROOT}/logs/build_star_multiome_atac_peak_mex.log" 2>&1
 fi
 
 sample_selected() {

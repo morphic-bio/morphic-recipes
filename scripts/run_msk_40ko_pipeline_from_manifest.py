@@ -26,8 +26,9 @@ from typing import Dict, Iterable, List, Optional, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+STAR_SUITE_ROOT = Path(os.environ.get("STAR_SUITE_ROOT", "/mnt/pikachu/STAR-suite"))
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "MSK_40KO_FASTQ_MANIFEST.tsv"
-DEFAULT_STAR_BIN = REPO_ROOT / "core" / "legacy" / "source" / "STAR"
+DEFAULT_STAR_BIN = STAR_SUITE_ROOT / "core" / "legacy" / "source" / "STAR"
 DEFAULT_GENOME_DIR = Path("/storage/autoindex_110_44/bulk_index")
 DEFAULT_OUT_ROOT = Path(
     "/storage/MSK-perturb-comparison/"
@@ -589,7 +590,8 @@ def process_group(
     manifest_lines = [
         f"created_utc={utc_now()}",
         f"sample={group}",
-        f"repo={REPO_ROOT}",
+        f"recipe_repo={REPO_ROOT}",
+        f"star_suite_root={STAR_SUITE_ROOT}",
         f"manifest={args.manifest}",
         f"star_bin={args.star_bin}",
         f"genome_dir={args.genome_dir}",

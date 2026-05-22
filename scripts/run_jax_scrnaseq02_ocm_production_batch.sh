@@ -3,12 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+STAR_SUITE_ROOT="${STAR_SUITE_ROOT:-/mnt/pikachu/STAR-suite}"
 
 RAW_DIR="${RAW_DIR:-/mnt/pikachu/JAX_scRNAseq02/raw}"
 OUT_PARENT="${OUT_PARENT:-/mnt/pikachu/JAX_scRNAseq02_processed}"
 BATCH_ROOT="${BATCH_ROOT:-${OUT_PARENT}/ocm_prod_batch_$(date -u +%Y%m%dT%H%M%SZ)}"
 FIRST_RUN_ROOT="${FIRST_RUN_ROOT:-}"
-STAR_BIN="${STAR_BIN:-${REPO_ROOT}/core/legacy/source/STAR}"
+STAR_BIN="${STAR_BIN:-${STAR_SUITE_ROOT}/core/legacy/source/STAR}"
 GENOME_DIR="${GENOME_DIR:-/storage/autoindex_110_44/bulk_index}"
 SOLO_CB_WHITELIST="${SOLO_CB_WHITELIST:-/storage/scRNAseq_output/whitelists/3M-3pgex-may-2023_TRU.txt}"
 THREADS="${THREADS:-16}"

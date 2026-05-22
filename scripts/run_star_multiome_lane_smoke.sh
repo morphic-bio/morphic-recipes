@@ -3,15 +3,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+STAR_SUITE_ROOT="${STAR_SUITE_ROOT:-/mnt/pikachu/STAR-suite}"
 
-STAR_BIN="${REPO_ROOT}/core/legacy/source/STAR"
+STAR_BIN="${STAR_BIN:-${STAR_SUITE_ROOT}/core/legacy/source/STAR}"
 NORMALIZE_ATAC_BC="${REPO_ROOT}/scripts/normalize_multiome_atac_barcode_fastq.py"
 PACKAGE_GENEFULL="${REPO_ROOT}/scripts/package_star_genefull_mex.py"
 PREPARE_VELOCYTO="${REPO_ROOT}/scripts/prepare_velocyto_mex.py"
 ALLOW_LEGACY_PREPARE_VELOCYTO="${ALLOW_LEGACY_PREPARE_VELOCYTO:-0}"
 REMOTE_POST_MEX="${REPO_ROOT}/scripts/run_remote_multiome_post_mex_rsync.sh"
 LOCAL_DOWNSTREAM="${REPO_ROOT}/scripts/run_scrna_downstream_gene_full_velocyto.sh"
-BUILD_ATAC_MEX_NATIVE="${REPO_ROOT}/core/features/libchromap_contract/star_multiome_atac_peak_mex"
+BUILD_ATAC_MEX_NATIVE="${STAR_SUITE_ROOT}/core/features/libchromap_contract/star_multiome_atac_peak_mex"
 BUILD_ATAC_MEX_PY="${REPO_ROOT}/scripts/build_atac_peak_matrix_from_fragments.py"
 BUILD_MUDATA="${REPO_ROOT}/scripts/build_multiome_mudata.py"
 
@@ -116,6 +117,9 @@ Other:
   --force-atac-barcode      Regenerate normalized ATAC barcode FASTQ
   --solo-inline-hash        Enable STARsolo inline hash mode (off by default)
   --help
+
+Environment:
+  STAR_SUITE_ROOT           STAR-suite checkout containing core/ (default: /mnt/pikachu/STAR-suite)
 EOF
 }
 
@@ -274,17 +278,17 @@ PY
 
 if [[ "${SKIP_BUILD}" != "1" ]]; then
   log "Clean rebuilding STAR with Chromap support"
-  make -C "${REPO_ROOT}/core/legacy/source" clean > "${OUT_DIR}/logs/build_clean.log" 2>&1
-  make -C "${REPO_ROOT}/core/legacy/source" -j8 STAR WITH_CHROMAP=1 > "${OUT_DIR}/logs/build_star_with_chromap.log" 2>&1
+  make -C "${STAR_SUITE_ROOT}/core/legacy/source" clean > "${OUT_DIR}/logs/build_clean.log" 2>&1
+  make -C "${STAR_SUITE_ROOT}/core/legacy/source" -j8 STAR WITH_CHROMAP=1 > "${OUT_DIR}/logs/build_star_with_chromap.log" 2>&1
   if [[ "${USE_NATIVE_ATAC_MEX}" == "1" ]]; then
     log "Building native ATAC peak-MEX tool"
-    make -C "${REPO_ROOT}/core/features/libchromap_contract" star_multiome_atac_peak_mex > "${OUT_DIR}/logs/build_star_multiome_atac_peak_mex.log" 2>&1
+    make -C "${STAR_SUITE_ROOT}/core/features/libchromap_contract" star_multiome_atac_peak_mex > "${OUT_DIR}/logs/build_star_multiome_atac_peak_mex.log" 2>&1
   fi
 fi
 
 if [[ "${USE_NATIVE_ATAC_MEX}" == "1" && ! -x "${BUILD_ATAC_MEX_NATIVE}" ]]; then
   log "Building native ATAC peak-MEX tool"
-  make -C "${REPO_ROOT}/core/features/libchromap_contract" star_multiome_atac_peak_mex > "${OUT_DIR}/logs/build_star_multiome_atac_peak_mex.log" 2>&1
+  make -C "${STAR_SUITE_ROOT}/core/features/libchromap_contract" star_multiome_atac_peak_mex > "${OUT_DIR}/logs/build_star_multiome_atac_peak_mex.log" 2>&1
 fi
 
 if [[ "${USE_NATIVE_ATAC_BARCODE}" == "1" ]]; then

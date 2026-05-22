@@ -10,7 +10,7 @@ code.
 
 ## Status
 
-Phase: initial mirror.
+Phase: Phase 1 cutover.
 
 The first import was copied from STAR-suite commit:
 
@@ -19,8 +19,8 @@ The first import was copied from STAR-suite commit:
 ```
 
 During the transition, files may exist in both repos. Treat this repo as the
-preferred home for new production recipe work, but expect some scripts to keep
-STAR-suite compatibility defaults until they are adapted.
+canonical home for production recipe work. STAR-suite compatibility launchers
+should delegate here while the duplicated scripts age out.
 
 ## Layout
 
@@ -31,12 +31,14 @@ mcp_server/workflows/  Mirrored workflow YAMLs during transition
 config/                Local environment templates
 ```
 
-## Using Mirrored Recipes
+## Using Recipes
 
-Most copied scripts preserve their STAR-suite-relative layout. Until wrappers
-are fully adapted, pass explicit core paths when needed:
+Production launchers that need STAR core tools default to the local core
+checkout at `/mnt/pikachu/STAR-suite`. Override that checkout with
+`STAR_SUITE_ROOT` when running from another host or clone:
 
 ```bash
+export STAR_SUITE_ROOT=/mnt/pikachu/STAR-suite
 --star-bin /mnt/pikachu/STAR-suite/core/legacy/source/STAR
 --genome-dir /storage/autoindex_110_44/bulk_index
 ```

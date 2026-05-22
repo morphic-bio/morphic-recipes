@@ -6,7 +6,7 @@ Source STAR-suite commit:
 43a5853af0c627925f827ab576814b770d1874c1
 ```
 
-Status: initial mirror. No STAR-suite files have been removed.
+Status: Phase 1 cutover. No STAR-suite files have been removed.
 
 ## Classification Rules
 
@@ -21,7 +21,7 @@ These files were copied as `duplicate-transition` or `move-recipe` candidates.
 
 | Path | Classification | Notes |
 | --- | --- | --- |
-| `scripts/run_msk_40ko_pipeline_from_manifest.py` | duplicate-transition | MSK 40KO production launcher. Needs explicit STAR-suite core path after split. |
+| `scripts/run_msk_40ko_pipeline_from_manifest.py` | duplicate-transition | MSK 40KO production launcher. Defaults to external STAR-suite via `STAR_SUITE_ROOT`. |
 | `scripts/run_msk_40ko_fastq_preflight.sh` | duplicate-transition | Dataset preflight wrapper. |
 | `scripts/run_msk_30ko_fastq_preflight.sh` | duplicate-transition | Dataset preflight wrapper. |
 | `scripts/preflight_whitelist_family.py` | duplicate-transition | Operational FASTQ chemistry preflight used by production recipes. |
@@ -69,11 +69,19 @@ These files were copied as `duplicate-transition` or `move-recipe` candidates.
 | `docs/RUNBOOK_SCRNA_MT_ADAPTIVE_FILTER_20260518.md` | duplicate-transition | Downstream filtering policy. |
 | `mcp_server/workflows/*.yaml` | duplicate-transition | Workflow schemas mirrored until STAR-suite can load external workflow dirs. |
 
-## Known Follow-Ups
+## Phase 1 Status
 
-1. Adapt production launchers to support `STAR_SUITE_ROOT` explicitly.
-2. Add canonical-owner headers to STAR-suite mirrors or replace them with thin
-   compatibility wrappers.
-3. Move packet builders from `plans/artifacts/` into stable recipe scripts.
-4. Add CI/lightweight linting for recipe command rendering.
-5. Create GitHub remotes once names and visibility are confirmed.
+Completed:
+
+- GitHub remotes were created for `morphic-recipes` and `morphic-provenance`.
+- MSK 40KO, JAX scRNAseq02 OCM, and JAX Multiome production launchers support
+  `STAR_SUITE_ROOT` for the external STAR-suite core checkout.
+- STAR-suite compatibility launchers should delegate here through
+  `MORPHIC_RECIPES_ROOT`.
+
+Remaining follow-ups:
+
+1. Move packet builders from `plans/artifacts/` into stable recipe scripts.
+2. Add CI/lightweight linting for recipe command rendering.
+3. Retire STAR-suite compatibility launchers after active runbooks and agents
+   have moved to this repo.

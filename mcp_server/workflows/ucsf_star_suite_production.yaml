@@ -230,8 +230,8 @@ parameters:
     cli_flag: "--star-bin"
     type: "file"
     required: false
-    default: "core/legacy/source/STAR.release"
-    description: "STAR binary path. Default is relative to repo root."
+    default: "/mnt/pikachu/STAR-suite/core/legacy/source/STAR.release"
+    description: "STAR binary path. Default points at the external STAR-suite core checkout."
     path_must_exist: true
     must_be_executable: true
     category: "inputs"

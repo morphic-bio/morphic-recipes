@@ -47,6 +47,14 @@ For CellBender production or handoff workflows, GPU mode is mandatory. The
 rendered command must include the recipe-level GPU flag, Docker GPU access, and
 CellBender `--cuda`.
 
+## STAR CLI MCP Recipes
+
+The mirrored MCP workflow schemas under `mcp_server/workflows/` expose
+operator-facing STAR commands during the repo split. The paired CBQ/BINSEQ
+batch recipe is `star_binseq_pe_batch`; it renders one STAR invocation with
+`--readFilesType Binseq PE` and either a comma-separated CBQ list or a CBQ
+manifest. See `docs/RUNBOOK_STAR_BINSEQ_CBQ_BATCH.md`.
+
 ## Canonical Boundary
 
 - Core behavior, source changes, and core regression tests: STAR-suite.

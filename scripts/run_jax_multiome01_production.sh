@@ -10,6 +10,7 @@ GLOBUS_UPLOADER="${REPO_ROOT}/scripts/upload_jax_multiome01_large_files_globus.s
 
 RAW_DIR="/mnt/pikachu/JAX_Multiome01/raw"
 METADATA_XLSX="/mnt/pikachu/DPC_metadata_template_Multiome1-complete.xlsx"
+SAMPLE_MANIFEST=""
 OUTPUT_ROOT="/mnt/pikachu/JAX_Multiome01_processed/star_multiome_$(date -u +%Y%m%dT%H%M%SZ)"
 REMOTE_HOST="${MULTIOME_REMOTE_HOST:-10.159.4.53}"
 REMOTE_ROOT="${MULTIOME_REMOTE_ROOT:-/home/lhhung/jax_multiome_remote_downstream_production}"
@@ -48,6 +49,8 @@ the next sample can start while remote post-MEX work runs.
 Options:
   --raw-dir PATH
   --metadata-xlsx PATH
+  --sample-manifest PATH    Use an existing production sample_manifest.tsv
+                            instead of rebuilding it from --metadata-xlsx
   --output-root PATH
   --remote-host HOST
   --remote-root PATH
@@ -84,6 +87,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --raw-dir) RAW_DIR="$2"; shift 2 ;;
     --metadata-xlsx) METADATA_XLSX="$2"; shift 2 ;;
+    --sample-manifest) SAMPLE_MANIFEST="$2"; shift 2 ;;
     --output-root) OUTPUT_ROOT="$2"; shift 2 ;;
     --remote-host) REMOTE_HOST="$2"; shift 2 ;;
     --remote-root) REMOTE_ROOT="$2"; shift 2 ;;
@@ -112,7 +116,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 RAW_DIR="$(realpath "${RAW_DIR}")"
-METADATA_XLSX="$(realpath "${METADATA_XLSX}")"
+if [[ -n "${SAMPLE_MANIFEST}" ]]; then
+  SAMPLE_MANIFEST="$(realpath "${SAMPLE_MANIFEST}")"
+else
+  METADATA_XLSX="$(realpath "${METADATA_XLSX}")"
+fi
 OUTPUT_ROOT="$(realpath -m "${OUTPUT_ROOT}")"
 
 case "${CHROMAP_START_MODE}" in
@@ -127,8 +135,14 @@ log() {
   printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" | tee -a "${OUTPUT_ROOT}/logs/production.log"
 }
 
-log "Writing production sample manifest"
-python3 - "${METADATA_XLSX}" "${RAW_DIR}" > "${MANIFEST}" <<'PY'
+if [[ -n "${SAMPLE_MANIFEST}" ]]; then
+  log "Using supplied production sample manifest: ${SAMPLE_MANIFEST}"
+  if [[ "$(realpath "${SAMPLE_MANIFEST}")" != "$(realpath -m "${MANIFEST}")" ]]; then
+    cp "${SAMPLE_MANIFEST}" "${MANIFEST}"
+  fi
+else
+  log "Writing production sample manifest"
+  python3 - "${METADATA_XLSX}" "${RAW_DIR}" > "${MANIFEST}" <<'PY'
 import collections
 import re
 import sys
@@ -214,6 +228,7 @@ for sample in sample_order:
         ",".join(sorted(run_ids[atac_lib])),
     ]))
 PY
+fi
 
 sample_count="$(tail -n +2 "${MANIFEST}" | wc -l)"
 log "Manifest contains ${sample_count} samples with all required workflow FASTQs present"

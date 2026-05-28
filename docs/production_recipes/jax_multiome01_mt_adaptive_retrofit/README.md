@@ -7,6 +7,12 @@ Multiome01 h5ad and h5mu outputs to the revised adaptive mitochondrial
 percentage policy. The retrofit was applied after initial production completion
 and before the revised h5mu Globus handoff.
 
+For full reproduction from a working root, start with:
+
+```text
+../jax_multiome01/run_all.sh
+```
+
 ## Executable Scripts
 
 - `scripts/convert_jax_multiome01_mt_adaptive_once.sh`: one-time conversion

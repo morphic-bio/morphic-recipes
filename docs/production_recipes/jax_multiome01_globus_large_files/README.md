@@ -7,6 +7,12 @@ compact h5mu handoff. It submits one checksum-synced Globus task per completed
 sample and, after successful transfer, deletes generated local BAM and Y/noY
 FASTQ artifacts while preserving raw input FASTQs locally.
 
+For full reproduction from a working root, start with:
+
+```text
+../jax_multiome01/run_all.sh
+```
+
 ## Executable Script
 
 ```text

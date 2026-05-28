@@ -8,6 +8,12 @@ MEX boundary, then the remote host runs RNA downstream analysis, CellBender,
 adaptive filtering, and MuData construction. STAR, Chromap, and libchromap are
 not required on the remote host.
 
+For full reproduction from a working root, start with:
+
+```text
+../jax_multiome01/run_all.sh
+```
+
 ## Executable Scripts
 
 - `scripts/run_remote_multiome_post_mex_rsync.sh`: stages MEX/ATAC inputs,

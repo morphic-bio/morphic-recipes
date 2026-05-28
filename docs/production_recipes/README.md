@@ -12,6 +12,8 @@ provenance record lives.
 
 The JAX Multiome01 production delivery used these recipe summaries:
 
+- `jax_multiome01/`: one-command reproduction entrypoint, including
+  `run_all.sh`.
 - `jax_multiome01_star_multiome/`: local STAR RNA plus Chromap ATAC production
   launcher and per-sample boundary runner.
 - `jax_multiome01_remote_post_mex/`: remote GPU post-MEX RNA downstream,

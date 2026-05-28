@@ -9,6 +9,12 @@ GeneFull/Velocyto and native Chromap ATAC integration, and stops at the
 local MEX/ATAC sidecar boundary so remote post-MEX work can run on the GPU
 host while the next sample starts locally.
 
+For full reproduction from a working root, start with:
+
+```text
+../jax_multiome01/run_all.sh
+```
+
 ## Executable Scripts
 
 - `scripts/run_jax_multiome01_production.sh`: top-level production launcher.

@@ -26,6 +26,8 @@ should delegate here while the duplicated scripts age out.
 
 ```text
 docs/                  Dataset runbooks and recipe-specific handoffs
+docs/production_recipes/
+                       Human-facing summaries for production recipe chains
 scripts/               Production launchers and downstream helpers
 mcp_server/workflows/  Mirrored workflow YAMLs during transition
 config/                Local environment templates

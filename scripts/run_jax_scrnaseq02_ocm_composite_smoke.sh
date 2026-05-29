@@ -19,6 +19,10 @@ SOLO_CB_WHITELIST="${SOLO_CB_WHITELIST:-/storage/scRNAseq_output/whitelists/3M-3
 STAR_OCM_BARCODE_MODE="${STAR_OCM_BARCODE_MODE:-flex}"
 STAR_NATIVE_OCM_BAM_SPLIT="${STAR_NATIVE_OCM_BAM_SPLIT:-yes}"
 STAR_NATIVE_OCM_MEX="${STAR_NATIVE_OCM_MEX:-auto}"
+STAR_INPUT_FORMAT="${STAR_INPUT_FORMAT:-fastq}"
+CBQ_ORDERED_ENCODER_BIN="${CBQ_ORDERED_ENCODER_BIN:-${STAR_SUITE_ROOT}/core/legacy/source/cbq_ordered_encoder}"
+CBQ_COMPRESSION_LEVEL="${CBQ_COMPRESSION_LEVEL:-0}"
+CBQ_BLOCK_SIZE="${CBQ_BLOCK_SIZE:-1048576}"
 STAR_YREMOVE="${STAR_YREMOVE:-yes}"
 STAR_BAM_CBUB_TAGS="${STAR_BAM_CBUB_TAGS:-no}"
 STAR_BAM_GXGN_TAGS="${STAR_BAM_GXGN_TAGS:-no}"
@@ -70,6 +74,9 @@ Options:
   --compare                  Compare STAR materialization to CR9 multi
   --force                    Recreate staged/scripted outputs for selected steps
   --star-out-samtype VALUE   None or "BAM Unsorted" (default: "BAM Unsorted")
+  --star-input-format fastq|cbq
+                              STAR input surface (default: fastq). CBQ uses ordered
+                              per-lane paired CBQ files in STAR mate order.
   --star-yremove yes|no      Emit STAR Y/noY BAM and FASTQ sidecars (default: yes)
   --star-bam-cbub yes|no     Emit barcode/UMI tags in BAMs; yes includes final CB/UB and triggers tagged replay (default: no)
   --star-bam-gxgn yes|no     Emit GX/GN gene tags in BAMs (default: no)
@@ -79,7 +86,8 @@ Options:
 
 Environment overrides:
   RAW_DIR CONFIG SAMPLE_ID SAMPLE_STEM LANES STAR_BIN GENOME_DIR STAR_OCM_BARCODE_MODE
-  STAR_NATIVE_OCM_BAM_SPLIT STAR_NATIVE_OCM_MEX STAR_YREMOVE STAR_BAM_CBUB_TAGS STAR_BAM_GXGN_TAGS
+  STAR_NATIVE_OCM_BAM_SPLIT STAR_NATIVE_OCM_MEX STAR_INPUT_FORMAT CBQ_ORDERED_ENCODER_BIN
+  CBQ_COMPRESSION_LEVEL CBQ_BLOCK_SIZE STAR_YREMOVE STAR_BAM_CBUB_TAGS STAR_BAM_GXGN_TAGS
   STAR_SOLO_FEATURES STAR_COMPARE_FEATURE SOLO_CB_WHITELIST CR_REFERENCE CELLRANGER_BIN CR_LOCALMEM CR_CREATE_BAM
   CR_REUSE_RUN_DIR CR_REUSE_SEARCH_ROOT OCM_PREP_REUSE_ROOT SIMPLEED_SIM_N OCM_MATERIALIZE_THREADS
 
@@ -130,6 +138,7 @@ while [[ $# -gt 0 ]]; do
     --compare) RUN_COMPARE=1; shift ;;
     --force) FORCE=1; shift ;;
     --star-out-samtype) STAR_OUTSAMTYPE="$2"; shift 2 ;;
+    --star-input-format) STAR_INPUT_FORMAT="$2"; shift 2 ;;
     --star-yremove) STAR_YREMOVE="$2"; shift 2 ;;
     --star-bam-cbub) STAR_BAM_CBUB_TAGS="$2"; shift 2 ;;
     --star-bam-gxgn) STAR_BAM_GXGN_TAGS="$2"; shift 2 ;;
@@ -164,10 +173,19 @@ case "${STAR_NATIVE_OCM_MEX}" in
   yes|no|auto) ;;
   *) die "STAR_NATIVE_OCM_MEX must be yes, no, or auto" ;;
 esac
+case "${STAR_INPUT_FORMAT}" in
+  fastq|cbq) ;;
+  *) die "STAR_INPUT_FORMAT must be fastq or cbq" ;;
+esac
+[[ "${CBQ_COMPRESSION_LEVEL}" =~ ^-?[0-9]+$ ]] || die "CBQ_COMPRESSION_LEVEL must be an integer"
+[[ "${CBQ_BLOCK_SIZE}" =~ ^[0-9]+$ && "${CBQ_BLOCK_SIZE}" -gt 0 ]] || die "CBQ_BLOCK_SIZE must be positive"
 case "${STAR_YREMOVE}" in
   yes|no) ;;
   *) die "STAR_YREMOVE must be yes or no" ;;
 esac
+if [[ "${STAR_INPUT_FORMAT}" == "cbq" && "${STAR_YREMOVE}" == "yes" ]]; then
+  die "STAR_YREMOVE=yes is FASTQ-only for now; rerun with --star-input-format cbq --star-yremove no"
+fi
 case "${STAR_BAM_CBUB_TAGS}" in
   yes|no) ;;
   *) die "STAR_BAM_CBUB_TAGS must be yes or no" ;;
@@ -183,7 +201,9 @@ OUT_ROOT="$(realpath -m "${OUT_ROOT}")"
 STAGE_ROOT="${OUT_ROOT}/stage"
 CR_FASTQS="${STAGE_ROOT}/cr_fastqs"
 STAR_FASTQS="${STAGE_ROOT}/star_composite_fastqs"
+STAR_CBQS="${STAGE_ROOT}/star_composite_cbq"
 COMPOSITE_WHITELIST="${STAGE_ROOT}/3M-3pgex-may-2023_TRU_OCM17.txt"
+STAR_CBQ_MANIFEST="${STAR_CBQS}/cbq_manifest.tsv"
 MANIFEST="${OUT_ROOT}/downsample_manifest.tsv"
 PREP_STATS="${OUT_ROOT}/prepare_stats.json"
 LOG_DIR="${OUT_ROOT}/logs"
@@ -340,8 +360,51 @@ source_fastq_name() {
   printf '%s_%s_%s_001.fastq.gz' "${SAMPLE_STEM}" "${lane}" "${read}"
 }
 
+source_cbq_name() {
+  local lane="$1"
+  printf '%s_%s_R2_R1.cbq' "${SAMPLE_STEM}" "${lane}"
+}
+
+prepare_star_cbq_inputs() {
+  [[ "${STAR_INPUT_FORMAT}" == "cbq" ]] || return 0
+  [[ -x "${CBQ_ORDERED_ENCODER_BIN}" ]] || die "Missing cbq_ordered_encoder: ${CBQ_ORDERED_ENCODER_BIN}"
+
+  local -a lane_array cbq_files
+  IFS=',' read -r -a lane_array <<< "${LANES}"
+  mkdir -p "${STAR_CBQS}"
+  : > "${STAR_CBQ_MANIFEST}"
+
+  local lane r1 r2 cbq encode_stdout encode_stderr
+  for lane in "${lane_array[@]}"; do
+    r1="${STAR_FASTQS}/$(source_fastq_name "${lane}" R1)"
+    r2="${STAR_FASTQS}/$(source_fastq_name "${lane}" R2)"
+    cbq="${STAR_CBQS}/$(source_cbq_name "${lane}")"
+    [[ -s "${r1}" ]] || die "Missing staged STAR R1 FASTQ for CBQ encoding: ${r1}"
+    [[ -s "${r2}" ]] || die "Missing staged STAR R2 FASTQ for CBQ encoding: ${r2}"
+
+    if [[ "${FORCE}" != "1" && -s "${cbq}" ]]; then
+      log "Reusing staged CBQ for ${lane}: ${cbq}"
+    else
+      log "Encoding STAR CBQ for ${lane} in STAR mate order (R2,R1)"
+      rm -f "${cbq}"
+      encode_stdout="${LOG_DIR}/cbq_encode_${lane}.stdout"
+      encode_stderr="${LOG_DIR}/cbq_encode_${lane}.stderr"
+      "${CBQ_ORDERED_ENCODER_BIN}" \
+        --readFilesIn "${r2}" "${r1}" \
+        --outFile "${cbq}" \
+        --compressionLevel "${CBQ_COMPRESSION_LEVEL}" \
+        --blockSize "${CBQ_BLOCK_SIZE}" \
+        > "${encode_stdout}" 2> "${encode_stderr}" \
+        || die "CBQ encoding failed for ${lane}; see ${encode_stderr}"
+      [[ -s "${cbq}" ]] || die "CBQ encoder produced an empty file for ${lane}: ${cbq}"
+    fi
+    cbq_files+=("${cbq}")
+    printf '%s\t%s\t%s\t%s\n' "${lane}" "${cbq}" "${r2}" "${r1}" >> "${STAR_CBQ_MANIFEST}"
+  done
+}
+
 render_star_script() {
-  local -a lane_array r1_files r2_files
+  local -a lane_array r1_files r2_files cbq_files
   IFS=',' read -r -a lane_array <<< "${LANES}"
   local star_cb_len=17
   local star_umi_start=18
@@ -359,10 +422,12 @@ render_star_script() {
   for lane in "${lane_array[@]}"; do
     r1_files+=("${STAR_FASTQS}/$(source_fastq_name "${lane}" R1)")
     r2_files+=("${STAR_FASTQS}/$(source_fastq_name "${lane}" R2)")
+    cbq_files+=("${STAR_CBQS}/$(source_cbq_name "${lane}")")
   done
-  local r1_csv r2_csv
+  local r1_csv r2_csv cbq_csv
   r1_csv="$(join_by_comma "${r1_files[@]}")"
   r2_csv="$(join_by_comma "${r2_files[@]}")"
+  cbq_csv="$(join_by_comma "${cbq_files[@]}")"
 
   local -a out_sam_args
   read -r -a out_sam_args <<< "${STAR_OUTSAMTYPE}"
@@ -384,8 +449,13 @@ render_star_script() {
     printf '  --runThreadN %q\n' "${THREADS}"
     printf '  --dynamicThreadInterface 1\n'
     printf '  --genomeDir %q\n' "${GENOME_DIR}"
-    printf '  --readFilesIn %q %q\n' "${r2_csv}" "${r1_csv}"
-    printf '  --readFilesCommand zcat\n'
+    if [[ "${STAR_INPUT_FORMAT}" == "cbq" ]]; then
+      printf '  --readFilesType Binseq PE\n'
+      printf '  --readFilesIn %q\n' "${cbq_csv}"
+    else
+      printf '  --readFilesIn %q %q\n' "${r2_csv}" "${r1_csv}"
+      printf '  --readFilesCommand zcat\n'
+    fi
     printf '  --outFileNamePrefix %q\n' "${STAR_RUN_DIR}/"
     printf '  --outTmpDir %q\n' "${STAR_TMP_DIR}"
     printf '  --outSAMtype'
@@ -507,6 +577,11 @@ out_root=${OUT_ROOT}
 star_ocm_barcode_mode=${STAR_OCM_BARCODE_MODE}
 star_native_ocm_bam_split=${STAR_NATIVE_OCM_BAM_SPLIT}
 star_native_ocm_mex=${STAR_NATIVE_OCM_MEX}
+star_input_format=${STAR_INPUT_FORMAT}
+cbq_ordered_encoder_bin=${CBQ_ORDERED_ENCODER_BIN}
+cbq_compression_level=${CBQ_COMPRESSION_LEVEL}
+cbq_block_size=${CBQ_BLOCK_SIZE}
+star_cbq_manifest=${STAR_CBQ_MANIFEST}
 star_yremove=${STAR_YREMOVE}
 star_bam_cbub_tags=${STAR_BAM_CBUB_TAGS}
 star_bam_gxgn_tags=${STAR_BAM_GXGN_TAGS}
@@ -516,6 +591,10 @@ cr_reuse_run_dir=${CR_REUSE_RUN_DIR}
 
 STAR composite run:
   ${STAR_SCRIPT}
+
+STAR input:
+  FASTQs: ${STAR_FASTQS}
+  CBQs when star_input_format=cbq: ${STAR_CBQS}
 
 Cell Ranger 9 multi control:
   ${CR_SCRIPT}
@@ -568,6 +647,7 @@ if [[ "${RUN_PREPARE}" == "1" ]]; then
         "${FORCE_ARGS[@]}"
     fi
   fi
+  prepare_star_cbq_inputs
   render_star_script
   render_cr_config
   render_cr_script

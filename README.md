@@ -53,9 +53,14 @@ CellBender `--cuda`.
 
 The mirrored MCP workflow schemas under `mcp_server/workflows/` expose
 operator-facing STAR commands during the repo split. The paired CBQ/BINSEQ
-batch recipe is `star_binseq_pe_batch`; it renders one STAR invocation with
-`--readFilesType Binseq PE` and either a comma-separated CBQ list or a CBQ
-manifest. See `docs/RUNBOOK_STAR_BINSEQ_CBQ_BATCH.md`.
+batch recipe is `star_binseq_pe_batch`; STAR-Flex CBQ is
+`star_flex_fixed_rna_cbq`. Both render `--readFilesType Binseq PE` with no
+`--readFilesCommand`. See `docs/RUNBOOK_STAR_BINSEQ_CBQ_BATCH.md`.
+
+The multiome lane recipe also accepts native CBQ on both sides:
+`scripts/run_star_multiome_lane_smoke.sh --input-format cbq --gex-cbq ...`
+plus `--atac-read-pair-cbq ... --atac-barcode-cbq ...`. That path renders
+STAR GEX CBQ input and libchromap ATAC CBQ input without `--readFilesCommand`.
 
 ## Canonical Boundary
 

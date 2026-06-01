@@ -4,6 +4,10 @@ This recipe is the operator-facing wrapper for STAR-suite's experimental native
 CBQ reader. STAR-suite remains the source of truth for the core implementation
 and tests; this repo owns dataset launch recipes and handoff policy.
 
+For Fixed RNA Profiling/Flex, use the dedicated MCP recipe
+`star_flex_fixed_rna_cbq`, which adds `--flex yes` and the Fixed RNA whitelist
+surface while preserving the same paired-CBQ input rules.
+
 ## MCP Workflow
 
 - Workflow id: `star_binseq_pe_batch`
@@ -51,8 +55,9 @@ STAR_SUITE_ROOT="${STAR_SUITE_ROOT:-/mnt/pikachu/STAR-suite}"
 
 ## Boundaries
 
-- Y/noY removal is FASTQ-only for now. Do not enable Y/noY FASTQ emission for
-  CBQ/BINSEQ inputs until STAR-suite adds a non-FASTQ path for that feature.
+- Y/noY FASTQ emission is not part of this recipe. For CBQ sidecars, use
+  `--emitYNoY yes --emitYNoYFormat cbq`; do not use `--emitYNoYFastq` with
+  CBQ/BINSEQ input.
 - For `--batchMode 1`, each comma-separated CBQ entry or manifest row is one
   sample/library.
 - For multi-lane alignment as a single sample, set `--batchMode 0` and pass the

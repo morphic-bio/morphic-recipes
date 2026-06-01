@@ -71,6 +71,12 @@ scripts/run_jax_multiome01_production.sh \
 The run was resumed from the same output root with `--skip-build` and
 `--start-at` after completed samples.
 
+For CBQ-native reruns, provide a sample manifest with `gex_cbq`,
+`atac_read_pair_cbq`, and `atac_barcode_cbq` columns appended after
+`atac_run_ids`, then add `--input-format cbq`. The per-sample STAR command uses
+`--readFilesType Binseq PE` for GEX and `--chromapAtacInputFormat cbq` for
+ATAC, with no `--readFilesCommand`.
+
 ## Outputs
 
 Per-sample local outputs include:

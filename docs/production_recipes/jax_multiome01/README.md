@@ -41,6 +41,10 @@ Under the selected root directory:
 - `outputs/<run>/`: reproduced STAR/Chromap, downstream, and MuData outputs.
 - `logs/run_all.log`: orchestrator log.
 
+CBQ-native reruns are supported by supplying a manifest with appended
+`gex_cbq`, `atac_read_pair_cbq`, and `atac_barcode_cbq` columns and passing
+`--input-format cbq` through `run_all.sh`.
+
 The exact run provenance for the May 2026 production delivery remains in
 `morphic-provenance`:
 

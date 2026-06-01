@@ -31,7 +31,8 @@ Implemented:
 - ordered per-lane CBQ staging under `stage/star_composite_cbq/`
 - one paired CBQ per lane in STARsolo mate order: R2 first, R1 second
 - rendered STAR command uses `--readFilesType Binseq PE`
-- CBQ mode rejects `STAR_YREMOVE=yes`
+- CBQ mode can emit Y/noY read sidecars with
+  `--emitYNoY yes --emitYNoYFormat cbq`
 - MCP workflow schemas updated in STAR-suite and morphic-recipes
 
 Passing smoke:
@@ -61,8 +62,6 @@ FASTQ-vs-CBQ parity smoke:
 - both runs: `Number of input reads = 1000`, uniquely mapped reads = `964`
 - `star_composite/run/Solo.out`: byte-identical
 - `star_composite/outs`: byte-identical, including native per-sample OCM MEX
-- CBQ with `--star-yremove yes` exits before staging with the expected
-  FASTQ-only error
 
 STAR-suite regression wrapper:
 
@@ -112,7 +111,7 @@ FASTQ mode is still the default:
 CBQ mode:
 
 ```bash
---star-input-format cbq --star-yremove no
+--star-input-format cbq --star-yremove yes --star-yremove-format cbq
 ```
 
 CBQ staging is derived from the STAR-specific staged FASTQs created by the OCM
@@ -145,17 +144,11 @@ Columns:
 lane    cbq_path    source_R2_fastq    source_R1_fastq
 ```
 
-## Y Removal Gate
+## Y Removal
 
-Y/noY FASTQ emission is currently FASTQ-only. The recipe exits early if CBQ is
-requested with Y removal enabled:
-
-```text
-STAR_YREMOVE=yes is FASTQ-only for now; rerun with --star-input-format cbq --star-yremove no
-```
-
-This follows the STAR-suite policy that Y-removal/Y-noY emission needs explicit
-support and smoke coverage for non-FASTQ input before the gate is relaxed.
+For FASTQ input, `--star-yremove-format auto` emits gzipped FASTQ sidecars. For
+CBQ input, `auto` emits CBQ sidecars. Use `--star-yremove-format fastq|cbq` to
+force a specific sidecar format.
 
 ## Clean Build
 
@@ -220,7 +213,8 @@ grep -F 'Number of input reads' "$OUT_ROOT/star_composite/run/Log.final.out"
 
 Before treating this as a release gate, run at least one larger comparison:
 
-1. Prepare and run FASTQ mode with `--star-yremove no`.
+1. Prepare and run FASTQ mode with `--star-yremove no` or
+   `--star-yremove-format fastq`.
 2. Prepare and run CBQ mode with the same `--read-pairs`, threads, and STAR
    output mode.
 3. Compare raw `Solo.out/GeneFull` and `Solo.out/Velocyto` outputs after any
@@ -240,14 +234,14 @@ STAR_SUITE_ROOT=/tmp/star_suite_ocm_cbq \
   --run-star \
   --threads 16 \
   --star-input-format cbq \
-  --star-yremove no \
-  --star-out-samtype None
+  --star-yremove yes \
+  --star-yremove-format cbq \
+  --star-out-samtype "BAM Unsorted"
 ```
 
 ## Known Limitations
 
 - CBQ mode currently encodes from staged FASTQs produced by the recipe. It does
   not yet consume an external CBQ packet directly.
-- Y/noY FASTQ emission remains gated to FASTQ input.
 - The passing smoke is a 1K functional smoke, not a performance benchmark.
 - CR comparison was not run for the CBQ smoke above.

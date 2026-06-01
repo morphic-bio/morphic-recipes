@@ -18,12 +18,17 @@ BUILD_MUDATA="${REPO_ROOT}/scripts/build_multiome_mudata.py"
 
 GEX_R1=""
 GEX_R2=""
+GEX_CBQ="${STAR_MULTIOME_GEX_CBQ:-}"
 ATAC_R1=""
 ATAC_BARCODE=""
 ATAC_R2=""
+ATAC_READ_PAIR_CBQ="${STAR_MULTIOME_ATAC_READ_PAIR_CBQ:-}"
+ATAC_BARCODE_CBQ="${STAR_MULTIOME_ATAC_BARCODE_CBQ:-}"
 OUT_DIR=""
 THREADS="${STAR_MULTIOME_THREADS:-16}"
 CHROMAP_THREADS="${STAR_MULTIOME_CHROMAP_THREADS:-8}"
+GEX_INPUT_FORMAT="${STAR_MULTIOME_GEX_INPUT_FORMAT:-fastq}"
+ATAC_INPUT_FORMAT="${STAR_MULTIOME_ATAC_INPUT_FORMAT:-fastq}"
 GENOME_DIR="${STAR_MULTIOME_GENOME_DIR:-/storage/autoindex_110_44/bulk_index}"
 GEX_WHITELIST="${STAR_MULTIOME_GEX_WHITELIST:-/mnt/pikachu/atac-seq/10xMultiome/pbmc_unsorted_3k/open_source_full_20260424_015259/refs/737K-arc-v1_gex.txt}"
 CHROMAP_REF="${STAR_MULTIOME_CHROMAP_REF:-/storage/autoindex_110_44/bulk_index/cellranger_ref/genome.fa}"
@@ -35,9 +40,11 @@ CHROMAP_LOW_MEM_RAM="${STAR_MULTIOME_CHROMAP_LOW_MEM_RAM:-0}"
 CHROMAP_MACS3_FRAG_LOW_MEM="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_LOW_MEM:-0}"
 CHROMAP_START_MODE="${STAR_MULTIOME_CHROMAP_START_MODE:-concurrent}"
 SOLO_STRAND="${STAR_MULTIOME_SOLO_STRAND:-Forward}"
+YREMOVE_FORMAT="${STAR_MULTIOME_YREMOVE_FORMAT:-auto}"
 ATAC_BARCODE_START="${STAR_MULTIOME_ATAC_BARCODE_START:-9}"
 ATAC_BARCODE_LENGTH="${STAR_MULTIOME_ATAC_BARCODE_LENGTH:-16}"
 ATAC_BARCODE_READ_FORMAT="${STAR_MULTIOME_ATAC_READ_FORMAT:-}"
+CHROMAP_ATAC_YREMOVE="${STAR_MULTIOME_CHROMAP_ATAC_YREMOVE:-1}"
 REMOTE_HOST="${MULTIOME_REMOTE_HOST:-}"
 REMOTE_ROOT="${MULTIOME_REMOTE_ROOT:-}"
 REMOTE_OUTPUT_NAME="${MULTIOME_REMOTE_OUTPUT_NAME:-downstream_genefull_velocyto_cellbender}"
@@ -60,6 +67,9 @@ Usage:
   run_star_multiome_lane_smoke.sh --gex-r1 PATH --gex-r2 PATH \
     --atac-r1 PATH --atac-barcode PATH --atac-r2 PATH --out-dir PATH [options]
 
+  run_star_multiome_lane_smoke.sh --input-format cbq --gex-cbq PATHS \
+    --atac-read-pair-cbq PATHS --atac-barcode-cbq PATHS --out-dir PATH [options]
+
 Runs a 10x Multiome STAR-suite sample workflow; FASTQ arguments may be a single
 path or a comma-separated multi-lane path list:
   1. run Chromap against the raw ATAC i5/barcode read using native read-format support
@@ -71,9 +81,14 @@ path or a comma-separated multi-lane path list:
 Required:
   --gex-r1 PATH             GEX R1 FASTQ containing CB/UMI
   --gex-r2 PATH             GEX R2 FASTQ containing cDNA
+  --gex-cbq PATHS           GEX paired CBQ CSV for --gex-input-format cbq;
+                            store mates in STAR order: cDNA R2, then barcode R1
   --atac-r1 PATH            ATAC genomic read 1 FASTQ
   --atac-barcode PATH       ATAC 24 bp i5/barcode read FASTQ
   --atac-r2 PATH            ATAC genomic read 2 / R3 FASTQ
+  --atac-read-pair-cbq PATHS
+                            ATAC paired read CBQ CSV for --atac-input-format cbq
+  --atac-barcode-cbq PATHS  ATAC barcode CBQ CSV for --atac-input-format cbq
   --out-dir PATH            Fresh output directory
 
 Reference/defaults:
@@ -99,6 +114,13 @@ Remote downstream:
 Other:
   --threads N
   --chromap-threads N
+  --input-format fastq|cbq  Set both GEX and ATAC input formats
+  --gex-input-format fastq|cbq
+  --atac-input-format fastq|cbq
+  --yremove-format auto|fastq|cbq|none
+                            GEX Y/noY sidecar format; auto matches GEX input
+  --no-chromap-atac-yremove
+                            Disable ATAC Y/noY BAM sidecars
   --chromap-low-mem        Enable STAR/Chromap low-memory overflow-spill mode
   --chromap-low-mem-ram N  RAM threshold in bytes for low-memory spill; 0 uses Chromap defaults
   --chromap-macs3-frag-low-mem
@@ -127,12 +149,20 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --gex-r1) GEX_R1="$2"; shift 2 ;;
     --gex-r2) GEX_R2="$2"; shift 2 ;;
+    --gex-cbq) GEX_CBQ="$2"; shift 2 ;;
     --atac-r1) ATAC_R1="$2"; shift 2 ;;
     --atac-barcode) ATAC_BARCODE="$2"; shift 2 ;;
     --atac-r2) ATAC_R2="$2"; shift 2 ;;
+    --atac-read-pair-cbq) ATAC_READ_PAIR_CBQ="$2"; shift 2 ;;
+    --atac-barcode-cbq) ATAC_BARCODE_CBQ="$2"; shift 2 ;;
     --out-dir) OUT_DIR="$2"; shift 2 ;;
     --threads) THREADS="$2"; shift 2 ;;
     --chromap-threads) CHROMAP_THREADS="$2"; shift 2 ;;
+    --input-format) GEX_INPUT_FORMAT="$2"; ATAC_INPUT_FORMAT="$2"; shift 2 ;;
+    --gex-input-format) GEX_INPUT_FORMAT="$2"; shift 2 ;;
+    --atac-input-format) ATAC_INPUT_FORMAT="$2"; shift 2 ;;
+    --yremove-format) YREMOVE_FORMAT="$2"; shift 2 ;;
+    --no-chromap-atac-yremove) CHROMAP_ATAC_YREMOVE="0"; shift ;;
     --chromap-low-mem) CHROMAP_LOW_MEM="1"; shift ;;
     --chromap-low-mem-ram) CHROMAP_LOW_MEM_RAM="$2"; shift 2 ;;
     --chromap-macs3-frag-low-mem) CHROMAP_MACS3_FRAG_LOW_MEM="1"; shift ;;
@@ -167,9 +197,42 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for required_name in GEX_R1 GEX_R2 ATAC_R1 ATAC_BARCODE ATAC_R2 OUT_DIR; do
-  [[ -n "${!required_name}" ]] || { echo "ERROR: --${required_name,,} is required" >&2; exit 1; }
-done
+[[ -n "${OUT_DIR}" ]] || { echo "ERROR: --out-dir is required" >&2; exit 1; }
+
+case "${GEX_INPUT_FORMAT}" in
+  fastq|cbq) ;;
+  *) echo "ERROR: --gex-input-format must be fastq or cbq" >&2; exit 1 ;;
+esac
+case "${ATAC_INPUT_FORMAT}" in
+  fastq|cbq) ;;
+  *) echo "ERROR: --atac-input-format must be fastq or cbq" >&2; exit 1 ;;
+esac
+case "${YREMOVE_FORMAT}" in
+  auto|fastq|cbq|none) ;;
+  *) echo "ERROR: --yremove-format must be auto, fastq, cbq, or none" >&2; exit 1 ;;
+esac
+case "${CHROMAP_ATAC_YREMOVE}" in
+  0|1) ;;
+  *) echo "ERROR: STAR_MULTIOME_CHROMAP_ATAC_YREMOVE must be 0 or 1" >&2; exit 1 ;;
+esac
+
+if [[ "${GEX_INPUT_FORMAT}" == "fastq" ]]; then
+  [[ -n "${GEX_R1}" ]] || { echo "ERROR: --gex-r1 is required for FASTQ GEX input" >&2; exit 1; }
+  [[ -n "${GEX_R2}" ]] || { echo "ERROR: --gex-r2 is required for FASTQ GEX input" >&2; exit 1; }
+else
+  [[ -n "${GEX_CBQ}" ]] || { echo "ERROR: --gex-cbq is required for CBQ GEX input" >&2; exit 1; }
+fi
+
+if [[ "${ATAC_INPUT_FORMAT}" == "fastq" ]]; then
+  [[ -n "${ATAC_R1}" ]] || { echo "ERROR: --atac-r1 is required for FASTQ ATAC input" >&2; exit 1; }
+  [[ -n "${ATAC_BARCODE}" ]] || { echo "ERROR: --atac-barcode is required for FASTQ ATAC input" >&2; exit 1; }
+  [[ -n "${ATAC_R2}" ]] || { echo "ERROR: --atac-r2 is required for FASTQ ATAC input" >&2; exit 1; }
+else
+  [[ -n "${ATAC_READ_PAIR_CBQ}" ]] || { echo "ERROR: --atac-read-pair-cbq is required for CBQ ATAC input" >&2; exit 1; }
+  [[ -n "${ATAC_BARCODE_CBQ}" ]] || { echo "ERROR: --atac-barcode-cbq is required for CBQ ATAC input" >&2; exit 1; }
+  [[ "${USE_NATIVE_ATAC_BARCODE}" == "1" ]] || { echo "ERROR: --normalize-atac-barcode is FASTQ-only" >&2; exit 1; }
+  [[ -z "${ATAC_BARCODE_READ_FORMAT}" ]] || { echo "ERROR: --chromap-atac-read-format is FASTQ-only; CBQ barcode packets are already extracted" >&2; exit 1; }
+fi
 
 case "${CHROMAP_START_MODE}" in
   postMapping|concurrent) ;;
@@ -206,11 +269,20 @@ first_csv_path() {
   echo "${first}"
 }
 
-GEX_R1="$(realpath_csv "${GEX_R1}")"
-GEX_R2="$(realpath_csv "${GEX_R2}")"
-ATAC_R1="$(realpath_csv "${ATAC_R1}")"
-ATAC_BARCODE="$(realpath_csv "${ATAC_BARCODE}")"
-ATAC_R2="$(realpath_csv "${ATAC_R2}")"
+if [[ "${GEX_INPUT_FORMAT}" == "fastq" ]]; then
+  GEX_R1="$(realpath_csv "${GEX_R1}")"
+  GEX_R2="$(realpath_csv "${GEX_R2}")"
+else
+  GEX_CBQ="$(realpath_csv "${GEX_CBQ}")"
+fi
+if [[ "${ATAC_INPUT_FORMAT}" == "fastq" ]]; then
+  ATAC_R1="$(realpath_csv "${ATAC_R1}")"
+  ATAC_BARCODE="$(realpath_csv "${ATAC_BARCODE}")"
+  ATAC_R2="$(realpath_csv "${ATAC_R2}")"
+else
+  ATAC_READ_PAIR_CBQ="$(realpath_csv "${ATAC_READ_PAIR_CBQ}")"
+  ATAC_BARCODE_CBQ="$(realpath_csv "${ATAC_BARCODE_CBQ}")"
+fi
 GENOME_DIR="$(realpath "${GENOME_DIR}")"
 GEX_WHITELIST="$(realpath "${GEX_WHITELIST}")"
 CHROMAP_REF="$(realpath "${CHROMAP_REF}")"
@@ -219,10 +291,21 @@ ATAC_WHITELIST="$(realpath "${ATAC_WHITELIST}")"
 ATAC_TO_GEX="$(realpath "${ATAC_TO_GEX}")"
 OUT_DIR="$(realpath -m "${OUT_DIR}")"
 
-for csv_paths in "${GEX_R1}" "${GEX_R2}" "${ATAC_R1}" "${ATAC_BARCODE}" "${ATAC_R2}"
-do
-  check_csv_paths_exist "${csv_paths}"
-done
+if [[ "${GEX_INPUT_FORMAT}" == "fastq" ]]; then
+  for csv_paths in "${GEX_R1}" "${GEX_R2}"; do
+    check_csv_paths_exist "${csv_paths}"
+  done
+else
+  check_csv_paths_exist "${GEX_CBQ}"
+fi
+if [[ "${ATAC_INPUT_FORMAT}" == "fastq" ]]; then
+  for csv_paths in "${ATAC_R1}" "${ATAC_BARCODE}" "${ATAC_R2}"; do
+    check_csv_paths_exist "${csv_paths}"
+  done
+else
+  check_csv_paths_exist "${ATAC_READ_PAIR_CBQ}"
+  check_csv_paths_exist "${ATAC_BARCODE_CBQ}"
+fi
 for path in "${GENOME_DIR}" "${GEX_WHITELIST}" "${CHROMAP_REF}" "${CHROMAP_INDEX}" \
   "${ATAC_WHITELIST}" "${ATAC_TO_GEX}" "${PACKAGE_GENEFULL}" \
   "${BUILD_MUDATA}"
@@ -242,8 +325,11 @@ fi
 mkdir -p "${OUT_DIR}/logs" "${OUT_DIR}/atac" "${OUT_DIR}/mudata"
 SAMPLE_DIR="${OUT_DIR}/star_sample"
 RUN_DIR="${SAMPLE_DIR}/run"
-ATAC_BC_NORM="${OUT_DIR}/atac/$(basename "$(first_csv_path "${ATAC_BARCODE}")" .fastq.gz).arc_atac_bc.fastq.gz"
+ATAC_BC_NORM=""
 ATAC_BC_FOR_CHROMAP="${ATAC_BARCODE}"
+if [[ "${ATAC_INPUT_FORMAT}" == "fastq" ]]; then
+  ATAC_BC_NORM="${OUT_DIR}/atac/$(basename "$(first_csv_path "${ATAC_BARCODE}")" .fastq.gz).arc_atac_bc.fastq.gz"
+fi
 ATAC_BAM="${RUN_DIR}/atac_possorted.bam"
 ATAC_SIDECAR="${RUN_DIR}/atac_fragments.bin"
 ATAC_PEAKS="${RUN_DIR}/atac_peaks.narrowPeak"
@@ -291,7 +377,9 @@ if [[ "${USE_NATIVE_ATAC_MEX}" == "1" && ! -x "${BUILD_ATAC_MEX_NATIVE}" ]]; the
   make -C "${STAR_SUITE_ROOT}/core/features/libchromap_contract" star_multiome_atac_peak_mex > "${OUT_DIR}/logs/build_star_multiome_atac_peak_mex.log" 2>&1
 fi
 
-if [[ "${USE_NATIVE_ATAC_BARCODE}" == "1" ]]; then
+if [[ "${ATAC_INPUT_FORMAT}" == "cbq" ]]; then
+  log "Using native Chromap ATAC CBQ input"
+elif [[ "${USE_NATIVE_ATAC_BARCODE}" == "1" ]]; then
   if [[ -z "${ATAC_BARCODE_READ_FORMAT}" ]]; then
     if ! [[ "${ATAC_BARCODE_START}" =~ ^[0-9]+$ && "${ATAC_BARCODE_LENGTH}" =~ ^[0-9]+$ ]]; then
       echo "ERROR: --atac-barcode-start/--atac-barcode-length must be positive integers" >&2
@@ -341,9 +429,42 @@ mkdir -p "${RUN_DIR}"
 STAR_COMMAND="${OUT_DIR}/RUN_STAR_MULTIOME.sh"
 solo_inline_hash_mode="no"
 [[ "${SOLO_INLINE_HASH}" == "1" ]] && solo_inline_hash_mode="yes"
+
+gex_read_block=""
+if [[ "${GEX_INPUT_FORMAT}" == "cbq" ]]; then
+  printf -v gex_read_block '  --readFilesType Binseq PE \\\n  --readFilesIn "%s" \\\n' "${GEX_CBQ}"
+else
+  printf -v gex_read_block '  --readFilesIn "%s" "%s" \\\n  --readFilesCommand zcat \\\n' "${GEX_R2}" "${GEX_R1}"
+fi
+
+effective_yremove_format="${YREMOVE_FORMAT}"
+if [[ "${effective_yremove_format}" == "auto" ]]; then
+  effective_yremove_format="${GEX_INPUT_FORMAT}"
+fi
+yremove_block=""
+case "${effective_yremove_format}" in
+  none) ;;
+  fastq)
+    printf -v yremove_block '  --emitNoYBAM yes \\\n  --emitYNoY yes \\\n  --emitYNoYFormat fastq \\\n  --emitYNoYFastqCompression gz \\\n'
+    ;;
+  cbq)
+    printf -v yremove_block '  --emitNoYBAM yes \\\n  --emitYNoY yes \\\n  --emitYNoYFormat cbq \\\n'
+    ;;
+esac
+
 chromap_read_format_block=""
-if [[ "${USE_NATIVE_ATAC_BARCODE}" == "1" ]]; then
+if [[ "${ATAC_INPUT_FORMAT}" == "fastq" && "${USE_NATIVE_ATAC_BARCODE}" == "1" ]]; then
   printf -v chromap_read_format_block '  --chromapAtacReadFormat "%s" \\\n' "${ATAC_BARCODE_READ_FORMAT}"
+fi
+chromap_read_block=""
+if [[ "${ATAC_INPUT_FORMAT}" == "cbq" ]]; then
+  printf -v chromap_read_block '  --chromapAtacInputFormat cbq \\\n  --chromapAtacReadPairCbq "%s" \\\n  --chromapAtacBarcodeCbq "%s" \\\n' "${ATAC_READ_PAIR_CBQ}" "${ATAC_BARCODE_CBQ}"
+else
+  printf -v chromap_read_block '  --chromapAtacRead1 "%s" \\\n  --chromapAtacRead2 "%s" \\\n  --chromapAtacBarcode "%s" \\\n%s' "${ATAC_R1}" "${ATAC_R2}" "${ATAC_BC_FOR_CHROMAP}" "${chromap_read_format_block}"
+fi
+chromap_yremove_block=""
+if [[ "${CHROMAP_ATAC_YREMOVE}" == "1" ]]; then
+  printf -v chromap_yremove_block '  --chromapAtacEmitNoYBam 1 \\\n  --chromapAtacEmitYBam 1 \\\n  --chromapAtacNoYOutput "%s" \\\n  --chromapAtacYOutput "%s" \\\n' "${RUN_DIR}/atac_possorted.noY.bam" "${RUN_DIR}/atac_possorted.Y.bam"
 fi
 cat > "${STAR_COMMAND}" <<EOF
 #!/usr/bin/env bash
@@ -352,15 +473,12 @@ set -euo pipefail
 "${STAR_BIN}" \\
   --runThreadN "${THREADS}" \\
   --genomeDir "${GENOME_DIR}" \\
-  --readFilesIn "${GEX_R2}" "${GEX_R1}" \\
-  --readFilesCommand zcat \\
+${gex_read_block}\
   --outFileNamePrefix "${RUN_DIR}/" \\
   --outTmpDir "${SAMPLE_DIR}/tmp" \\
   --outSAMtype BAM Unsorted \\
   --outSAMattributes NH HI AS nM NM GX GN \\
-  --emitNoYBAM yes \\
-  --emitYNoYFastq yes \\
-  --emitYNoYFastqCompression gz \\
+${yremove_block}\
   --clipAdapterType CellRanger4 \\
   --clip3pPolyG yes \\
   --alignEndsType Local \\
@@ -387,15 +505,14 @@ set -euo pipefail
   --chromapAtacStartMode "${CHROMAP_START_MODE}" \\
   --chromapAtacReferenceFasta "${CHROMAP_REF}" \\
   --chromapAtacIndex "${CHROMAP_INDEX}" \\
-  --chromapAtacRead1 "${ATAC_R1}" \\
-  --chromapAtacRead2 "${ATAC_R2}" \\
-  --chromapAtacBarcode "${ATAC_BC_FOR_CHROMAP}" \\
-${chromap_read_format_block}  --chromapAtacBarcodeWhitelist "${ATAC_WHITELIST}" \\
+${chromap_read_block}\
+  --chromapAtacBarcodeWhitelist "${ATAC_WHITELIST}" \\
   --chromapAtacBarcodeTranslate "${ATAC_TO_GEX}" \\
   --chromapAtacBarcodeTranslateFromFirst 1 \\
   --chromapAtacOutputFormat BAM \\
   --chromapAtacOutputFragments "${ATAC_BAM}" \\
   --chromapAtacSecondaryFragments "${ATAC_SIDECAR}" \\
+${chromap_yremove_block}\
   --chromapAtacSortBam 1 \\
   --chromapAtacSummary "${RUN_DIR}/chromap_summary.csv" \\
   --chromapAtacThreads "${CHROMAP_THREADS}" \\
@@ -589,13 +706,20 @@ PY
 
 {
   printf 'date_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'gex_input_format=%s\n' "${GEX_INPUT_FORMAT}"
   printf 'gex_r1=%s\n' "${GEX_R1}"
   printf 'gex_r2=%s\n' "${GEX_R2}"
+  printf 'gex_cbq=%s\n' "${GEX_CBQ}"
+  printf 'gex_yremove_format=%s\n' "${effective_yremove_format}"
+  printf 'atac_input_format=%s\n' "${ATAC_INPUT_FORMAT}"
   printf 'atac_r1=%s\n' "${ATAC_R1}"
   printf 'atac_barcode_raw=%s\n' "${ATAC_BARCODE}"
-  printf 'atac_barcode_for_chromap=%s\n' "${ATAC_BC_FOR_CHROMAP}"
-  printf 'atac_barcode_normalized=%s\n' "$([[ "${USE_NATIVE_ATAC_BARCODE}" == "1" ]] && echo "-" || echo "${ATAC_BC_NORM}")"
+  printf 'atac_barcode_for_chromap=%s\n' "$([[ "${ATAC_INPUT_FORMAT}" == "fastq" ]] && echo "${ATAC_BC_FOR_CHROMAP}" || echo "-")"
+  printf 'atac_barcode_normalized=%s\n' "$([[ "${ATAC_INPUT_FORMAT}" == "fastq" && "${USE_NATIVE_ATAC_BARCODE}" != "1" ]] && echo "${ATAC_BC_NORM}" || echo "-")"
   printf 'atac_r2=%s\n' "${ATAC_R2}"
+  printf 'atac_read_pair_cbq=%s\n' "${ATAC_READ_PAIR_CBQ}"
+  printf 'atac_barcode_cbq=%s\n' "${ATAC_BARCODE_CBQ}"
+  printf 'chromap_atac_yremove=%s\n' "${CHROMAP_ATAC_YREMOVE}"
   printf 'genome_dir=%s\n' "${GENOME_DIR}"
   printf 'gex_whitelist=%s\n' "${GEX_WHITELIST}"
   printf 'chromap_ref=%s\n' "${CHROMAP_REF}"
@@ -611,7 +735,7 @@ PY
   printf 'native_atac_barcode=%s\n' "${USE_NATIVE_ATAC_BARCODE}"
   printf 'native_atac_mex=%s\n' "${USE_NATIVE_ATAC_MEX}"
   printf 'atac_barcode_window=%s:%s_rc\n' "${ATAC_BARCODE_START}" "${ATAC_BARCODE_LENGTH}"
-  printf 'chromap_atac_read_format=%s\n' "$([[ "${USE_NATIVE_ATAC_BARCODE}" == "1" ]] && echo "${ATAC_BARCODE_READ_FORMAT}" || echo "-")"
+  printf 'chromap_atac_read_format=%s\n' "$([[ "${ATAC_INPUT_FORMAT}" == "fastq" && "${USE_NATIVE_ATAC_BARCODE}" == "1" ]] && echo "${ATAC_BARCODE_READ_FORMAT}" || echo "-")"
   printf 'run_dir=%s\n' "${RUN_DIR}"
   printf 'downstream_dir=%s\n' "${DOWNSTREAM_DIR}"
   printf 'atac_bam=%s\n' "${ATAC_BAM}"

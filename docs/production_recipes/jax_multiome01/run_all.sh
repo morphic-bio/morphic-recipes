@@ -16,6 +16,7 @@ REMOTE_HOST="${MULTIOME_REMOTE_HOST:-10.159.4.53}"
 REMOTE_ROOT="${MULTIOME_REMOTE_ROOT:-/home/lhhung/jax_multiome_remote_downstream_production}"
 THREADS="${STAR_MULTIOME_THREADS:-16}"
 CHROMAP_THREADS="${STAR_MULTIOME_CHROMAP_THREADS:-16}"
+INPUT_FORMAT="${STAR_MULTIOME_INPUT_FORMAT:-fastq}"
 CHROMAP_START_MODE="${STAR_MULTIOME_CHROMAP_START_MODE:-concurrent}"
 GENOME_DIR="${STAR_MULTIOME_GENOME_DIR:-/storage/autoindex_110_44/bulk_index}"
 GEX_WHITELIST="${STAR_MULTIOME_GEX_WHITELIST:-/mnt/pikachu/atac-seq/10xMultiome/pbmc_unsorted_3k/open_source_full_20260424_015259/refs/737K-arc-v1_gex.txt}"
@@ -86,6 +87,10 @@ Run options:
   --remote-root PATH
   --threads N
   --chromap-threads N
+  --input-format fastq|cbq
+                           Use CBQ-native STAR/Chromap inputs from a supplied
+                           manifest with gex_cbq, atac_read_pair_cbq, and
+                           atac_barcode_cbq columns.
   --chromap-start-mode MODE
   --genome-dir PATH
   --gex-whitelist PATH
@@ -130,6 +135,7 @@ while [[ $# -gt 0 ]]; do
     --remote-root) REMOTE_ROOT="$2"; shift 2 ;;
     --threads) THREADS="$2"; shift 2 ;;
     --chromap-threads) CHROMAP_THREADS="$2"; shift 2 ;;
+    --input-format) INPUT_FORMAT="$2"; shift 2 ;;
     --chromap-start-mode) CHROMAP_START_MODE="$2"; shift 2 ;;
     --genome-dir) GENOME_DIR="$2"; shift 2 ;;
     --gex-whitelist) GEX_WHITELIST="$2"; shift 2 ;;
@@ -358,6 +364,7 @@ production_args=(
   --output-root "${OUTPUT_ROOT}"
   --threads "${THREADS}"
   --chromap-threads "${CHROMAP_THREADS}"
+  --input-format "${INPUT_FORMAT}"
   --chromap-low-mem
   --chromap-macs3-frag-low-mem
   --chromap-start-mode "${CHROMAP_START_MODE}"

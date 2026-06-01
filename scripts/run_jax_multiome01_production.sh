@@ -16,6 +16,7 @@ REMOTE_HOST="${MULTIOME_REMOTE_HOST:-10.159.4.53}"
 REMOTE_ROOT="${MULTIOME_REMOTE_ROOT:-/home/lhhung/jax_multiome_remote_downstream_production}"
 THREADS="${STAR_MULTIOME_THREADS:-16}"
 CHROMAP_THREADS="${STAR_MULTIOME_CHROMAP_THREADS:-16}"
+INPUT_FORMAT="${STAR_MULTIOME_INPUT_FORMAT:-fastq}"
 CHROMAP_LOW_MEM="${STAR_MULTIOME_CHROMAP_LOW_MEM:-1}"
 CHROMAP_LOW_MEM_RAM="${STAR_MULTIOME_CHROMAP_LOW_MEM_RAM:-0}"
 CHROMAP_MACS3_FRAG_LOW_MEM="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_LOW_MEM:-1}"
@@ -56,6 +57,11 @@ Options:
   --remote-root PATH
   --threads N
   --chromap-threads N
+  --input-format fastq|cbq
+                          Input surface for both GEX and ATAC. FASTQ uses the
+                          metadata-derived FASTQs. CBQ requires a supplied
+                          manifest with extra columns: gex_cbq,
+                          atac_read_pair_cbq, atac_barcode_cbq.
   --chromap-low-mem
   --chromap-low-mem-ram N
   --chromap-macs3-frag-low-mem
@@ -93,6 +99,7 @@ while [[ $# -gt 0 ]]; do
     --remote-root) REMOTE_ROOT="$2"; shift 2 ;;
     --threads) THREADS="$2"; shift 2 ;;
     --chromap-threads) CHROMAP_THREADS="$2"; shift 2 ;;
+    --input-format) INPUT_FORMAT="$2"; shift 2 ;;
     --chromap-low-mem) CHROMAP_LOW_MEM="1"; shift ;;
     --chromap-low-mem-ram) CHROMAP_LOW_MEM_RAM="$2"; shift 2 ;;
     --chromap-macs3-frag-low-mem) CHROMAP_MACS3_FRAG_LOW_MEM="1"; shift ;;
@@ -126,6 +133,10 @@ OUTPUT_ROOT="$(realpath -m "${OUTPUT_ROOT}")"
 case "${CHROMAP_START_MODE}" in
   postMapping|concurrent) ;;
   *) echo "ERROR: --chromap-start-mode must be postMapping or concurrent" >&2; exit 1 ;;
+esac
+case "${INPUT_FORMAT}" in
+  fastq|cbq) ;;
+  *) echo "ERROR: --input-format must be fastq or cbq" >&2; exit 1 ;;
 esac
 
 mkdir -p "${OUTPUT_ROOT}/metadata" "${OUTPUT_ROOT}/logs" "${OUTPUT_ROOT}/samples"
@@ -232,7 +243,7 @@ fi
 
 sample_count="$(tail -n +2 "${MANIFEST}" | wc -l)"
 log "Manifest contains ${sample_count} samples with all required workflow FASTQs present"
-log "Production settings: STAR threads=${THREADS}, Chromap threads=${CHROMAP_THREADS}, Chromap low-mem=${CHROMAP_LOW_MEM}, Chromap low-mem RAM=${CHROMAP_LOW_MEM_RAM}, MACS3 fragment low-mem=${CHROMAP_MACS3_FRAG_LOW_MEM}"
+log "Production settings: input=${INPUT_FORMAT}, STAR threads=${THREADS}, Chromap threads=${CHROMAP_THREADS}, Chromap low-mem=${CHROMAP_LOW_MEM}, Chromap low-mem RAM=${CHROMAP_LOW_MEM_RAM}, MACS3 fragment low-mem=${CHROMAP_MACS3_FRAG_LOW_MEM}"
 if [[ "${MANIFEST_ONLY}" == "1" ]]; then
   log "Manifest-only mode complete"
   echo "Manifest: ${MANIFEST}"
@@ -264,7 +275,7 @@ REMOTE_POST_MEX_LOCK="${OUTPUT_ROOT}/logs/remote_post_mex.lock"
 post_mex_pids=()
 post_mex_samples=()
 
-while IFS=$'\t' read -r sample sample_slug atac_lib gex_lib gex_r1 gex_r2 atac_r1 atac_barcode atac_r2 gex_run_ids atac_run_ids; do
+while IFS=$'\t' read -r sample sample_slug atac_lib gex_lib gex_r1 gex_r2 atac_r1 atac_barcode atac_r2 gex_run_ids atac_run_ids gex_cbq atac_read_pair_cbq atac_barcode_cbq _extra; do
   if [[ "${start_reached}" != "1" ]]; then
     if [[ "${START_AT}" == "${sample}" || "${START_AT}" == "${sample_slug}" ]]; then
       start_reached="1"
@@ -288,11 +299,6 @@ while IFS=$'\t' read -r sample sample_slug atac_lib gex_lib gex_r1 gex_r2 atac_r
   log "Running ${sample} (ATAC ${atac_lib}; GEX ${gex_lib})"
   args=(
     "${SMOKE_RUNNER}"
-    --gex-r1 "${gex_r1}"
-    --gex-r2 "${gex_r2}"
-    --atac-r1 "${atac_r1}"
-    --atac-barcode "${atac_barcode}"
-    --atac-r2 "${atac_r2}"
     --out-dir "${sample_out}"
     --threads "${THREADS}"
     --chromap-threads "${CHROMAP_THREADS}"
@@ -301,6 +307,25 @@ while IFS=$'\t' read -r sample sample_slug atac_lib gex_lib gex_r1 gex_r2 atac_r
     --skip-build
     --stop-after-local-mex
   )
+  if [[ "${INPUT_FORMAT}" == "cbq" ]]; then
+    [[ -n "${gex_cbq:-}" && "${gex_cbq}" != "-" ]] || { echo "ERROR: manifest is missing gex_cbq for ${sample}" >&2; exit 1; }
+    [[ -n "${atac_read_pair_cbq:-}" && "${atac_read_pair_cbq}" != "-" ]] || { echo "ERROR: manifest is missing atac_read_pair_cbq for ${sample}" >&2; exit 1; }
+    [[ -n "${atac_barcode_cbq:-}" && "${atac_barcode_cbq}" != "-" ]] || { echo "ERROR: manifest is missing atac_barcode_cbq for ${sample}" >&2; exit 1; }
+    args+=(
+      --input-format cbq
+      --gex-cbq "${gex_cbq}"
+      --atac-read-pair-cbq "${atac_read_pair_cbq}"
+      --atac-barcode-cbq "${atac_barcode_cbq}"
+    )
+  else
+    args+=(
+      --gex-r1 "${gex_r1}"
+      --gex-r2 "${gex_r2}"
+      --atac-r1 "${atac_r1}"
+      --atac-barcode "${atac_barcode}"
+      --atac-r2 "${atac_r2}"
+    )
+  fi
   [[ "${CHROMAP_LOW_MEM}" == "1" ]] && args+=(--chromap-low-mem)
   [[ "${CHROMAP_MACS3_FRAG_LOW_MEM}" == "1" ]] && args+=(--chromap-macs3-frag-low-mem)
   [[ "${FORCE}" == "1" ]] && args+=(--force)

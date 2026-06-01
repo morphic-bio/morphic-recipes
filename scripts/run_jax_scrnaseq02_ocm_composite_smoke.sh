@@ -24,6 +24,7 @@ CBQ_ORDERED_ENCODER_BIN="${CBQ_ORDERED_ENCODER_BIN:-${STAR_SUITE_ROOT}/core/lega
 CBQ_COMPRESSION_LEVEL="${CBQ_COMPRESSION_LEVEL:-0}"
 CBQ_BLOCK_SIZE="${CBQ_BLOCK_SIZE:-1048576}"
 STAR_YREMOVE="${STAR_YREMOVE:-yes}"
+STAR_YREMOVE_FORMAT="${STAR_YREMOVE_FORMAT:-auto}"
 STAR_BAM_CBUB_TAGS="${STAR_BAM_CBUB_TAGS:-no}"
 STAR_BAM_GXGN_TAGS="${STAR_BAM_GXGN_TAGS:-no}"
 STAR_SOLO_FEATURES="${STAR_SOLO_FEATURES:-GeneFull Velocyto}"
@@ -77,7 +78,9 @@ Options:
   --star-input-format fastq|cbq
                               STAR input surface (default: fastq). CBQ uses ordered
                               per-lane paired CBQ files in STAR mate order.
-  --star-yremove yes|no      Emit STAR Y/noY BAM and FASTQ sidecars (default: yes)
+  --star-yremove yes|no      Emit STAR Y/noY BAM and read sidecars (default: yes)
+  --star-yremove-format auto|fastq|cbq
+                              Y/noY read sidecar format; auto matches STAR input
   --star-bam-cbub yes|no     Emit barcode/UMI tags in BAMs; yes includes final CB/UB and triggers tagged replay (default: no)
   --star-bam-gxgn yes|no     Emit GX/GN gene tags in BAMs (default: no)
   --star-solo-features VALUE STAR solo features (default: "GeneFull Velocyto")
@@ -87,7 +90,7 @@ Options:
 Environment overrides:
   RAW_DIR CONFIG SAMPLE_ID SAMPLE_STEM LANES STAR_BIN GENOME_DIR STAR_OCM_BARCODE_MODE
   STAR_NATIVE_OCM_BAM_SPLIT STAR_NATIVE_OCM_MEX STAR_INPUT_FORMAT CBQ_ORDERED_ENCODER_BIN
-  CBQ_COMPRESSION_LEVEL CBQ_BLOCK_SIZE STAR_YREMOVE STAR_BAM_CBUB_TAGS STAR_BAM_GXGN_TAGS
+  CBQ_COMPRESSION_LEVEL CBQ_BLOCK_SIZE STAR_YREMOVE STAR_YREMOVE_FORMAT STAR_BAM_CBUB_TAGS STAR_BAM_GXGN_TAGS
   STAR_SOLO_FEATURES STAR_COMPARE_FEATURE SOLO_CB_WHITELIST CR_REFERENCE CELLRANGER_BIN CR_LOCALMEM CR_CREATE_BAM
   CR_REUSE_RUN_DIR CR_REUSE_SEARCH_ROOT OCM_PREP_REUSE_ROOT SIMPLEED_SIM_N OCM_MATERIALIZE_THREADS
 
@@ -140,6 +143,7 @@ while [[ $# -gt 0 ]]; do
     --star-out-samtype) STAR_OUTSAMTYPE="$2"; shift 2 ;;
     --star-input-format) STAR_INPUT_FORMAT="$2"; shift 2 ;;
     --star-yremove) STAR_YREMOVE="$2"; shift 2 ;;
+    --star-yremove-format) STAR_YREMOVE_FORMAT="$2"; shift 2 ;;
     --star-bam-cbub) STAR_BAM_CBUB_TAGS="$2"; shift 2 ;;
     --star-bam-gxgn) STAR_BAM_GXGN_TAGS="$2"; shift 2 ;;
     --star-solo-features) STAR_SOLO_FEATURES="$2"; shift 2 ;;
@@ -183,9 +187,10 @@ case "${STAR_YREMOVE}" in
   yes|no) ;;
   *) die "STAR_YREMOVE must be yes or no" ;;
 esac
-if [[ "${STAR_INPUT_FORMAT}" == "cbq" && "${STAR_YREMOVE}" == "yes" ]]; then
-  die "STAR_YREMOVE=yes is FASTQ-only for now; rerun with --star-input-format cbq --star-yremove no"
-fi
+case "${STAR_YREMOVE_FORMAT}" in
+  auto|fastq|cbq) ;;
+  *) die "STAR_YREMOVE_FORMAT must be auto, fastq, or cbq" ;;
+esac
 case "${STAR_BAM_CBUB_TAGS}" in
   yes|no) ;;
   *) die "STAR_BAM_CBUB_TAGS must be yes or no" ;;
@@ -431,6 +436,10 @@ render_star_script() {
 
   local -a out_sam_args
   read -r -a out_sam_args <<< "${STAR_OUTSAMTYPE}"
+  local star_yremove_format="${STAR_YREMOVE_FORMAT}"
+  if [[ "${star_yremove_format}" == "auto" ]]; then
+    star_yremove_format="${STAR_INPUT_FORMAT}"
+  fi
 
   {
     printf '#!/usr/bin/env bash\n'
@@ -465,9 +474,14 @@ render_star_script() {
     done
     printf '\n'
     if [[ "${STAR_YREMOVE}" == "yes" ]]; then
-      printf '  --emitNoYBAM yes\n'
-      printf '  --emitYNoYFastq yes\n'
-      printf '  --emitYNoYFastqCompression gz\n'
+      if [[ "${out_sam_args[0]:-}" != "None" ]]; then
+        printf '  --emitNoYBAM yes\n'
+      fi
+      printf '  --emitYNoY yes\n'
+      printf '  --emitYNoYFormat %q\n' "${star_yremove_format}"
+      if [[ "${star_yremove_format}" == "fastq" ]]; then
+        printf '  --emitYNoYFastqCompression gz\n'
+      fi
     fi
     local star_sam_attrs=(NH HI AS nM NM)
     if [[ "${STAR_BAM_CBUB_TAGS}" == "yes" ]]; then
@@ -583,6 +597,7 @@ cbq_compression_level=${CBQ_COMPRESSION_LEVEL}
 cbq_block_size=${CBQ_BLOCK_SIZE}
 star_cbq_manifest=${STAR_CBQ_MANIFEST}
 star_yremove=${STAR_YREMOVE}
+star_yremove_format=${STAR_YREMOVE_FORMAT}
 star_bam_cbub_tags=${STAR_BAM_CBUB_TAGS}
 star_bam_gxgn_tags=${STAR_BAM_GXGN_TAGS}
 star_solo_features=${STAR_SOLO_FEATURES}

@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# === GENERIC 10x multiome recipe (RNA + ATAC) ===============================
+# Parameterized lane runner with no project-specific assumptions. The MorPhiC
+# production wrapper is scripts/run_jax_multiome01_production.sh.
+#
+# PROVENANCE-FIRST: the thread/memory/low-mem defaults here are STARTING POINTS,
+# not turnkey values. For any non-trivial run, copy the known-good config from
+#   morphic-provenance/runs/<project>/{run.json,commands/}
+# rather than inventing parameters. The verified jax_multiome01 production config
+# that produced the full output set on a 125 GB machine without OOM was:
+#   --threads 16 --chromap-threads 16 --chromap-low-mem --chromap-macs3-frag-low-mem
+#   --chromap-start-mode concurrent
+# Running with invented parameters (e.g. --threads 32 --chromap-threads 32 and no
+# low-mem flags) is a known OOM failure mode.
+# ============================================================================
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STAR_SUITE_ROOT="${STAR_SUITE_ROOT:-/mnt/pikachu/STAR-suite}"

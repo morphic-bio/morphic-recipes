@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# === MorPhiC production multiome wrapper ====================================
+# Wraps the GENERIC lane runner (scripts/run_star_multiome_lane_smoke.sh) with
+# MorPhiC-specific concerns: sample manifest, remote CellBender (GPU), and the
+# Globus handoff. Use the generic runner directly for non-MorPhiC datasets.
+#
+# PROVENANCE-FIRST: the verified production run is recorded at
+#   morphic-provenance/runs/jax_multiome01/   (read run.json + commands/)
+# Reproduce those exact parameters; do not invent thread/memory params. The
+# known-good config is --threads 16 --chromap-threads 16 --chromap-low-mem
+# --chromap-macs3-frag-low-mem --chromap-start-mode concurrent.
+# ============================================================================
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STAR_SUITE_ROOT="${STAR_SUITE_ROOT:-/mnt/pikachu/STAR-suite}"

@@ -2,6 +2,18 @@
 
 This repo contains operational recipes, not STAR-suite core code.
 
+## Recipe catalog (start here)
+
+The curated list of canonical **starting points** is the single source of truth in
+[`catalog.yaml`](catalog.yaml) (agent-friendly) with generated human views
+[`RECIPES.md`](RECIPES.md) (table) and `RECIPES.xlsx`. It is deliberately **small** —
+it holds starting points, not a record of every run (that is `morphic-provenance`).
+Pick a recipe there, then read its script header (`COMPOSITION` block) and the
+"Compose to the target" + "Consult provenance" guidance below.
+
+Regenerate the human views after editing `catalog.yaml` (never hand-edit them):
+`python3 scripts/render_recipe_catalog.py`.
+
 ## Local Core Dependency
 
 - Use STAR-suite for core source and binaries.

@@ -8,6 +8,10 @@ packet builders. STAR-suite remains the canonical home for core STAR/Flex/Solo
 source, compiled tools, core tests, release packaging, and generic MCP server
 code.
 
+**Recipe catalog:** the curated list of starting points is [`catalog.yaml`](catalog.yaml)
+(source of truth) with generated human views [`RECIPES.md`](RECIPES.md) and
+`RECIPES.xlsx` (regenerate with `python3 scripts/render_recipe_catalog.py`).
+
 ## Status
 
 Phase: Phase 1 cutover.

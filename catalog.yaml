@@ -1,0 +1,97 @@
+# Canonical recipe catalog — the curated SINGLE SOURCE OF TRUTH for morphic-recipes
+# STARTING POINTS. Deliberately small (cf. morphic-provenance, which records every
+# run regardless of uniqueness). Adding a recipe = a deliberate entry here.
+#
+# This YAML is the source of truth. The human-readable views (RECIPES.md and
+# RECIPES.xlsx) are GENERATED from it by scripts/render_recipe_catalog.py —
+# do NOT hand-edit them. Regenerate after any change:
+#     python3 scripts/render_recipe_catalog.py
+#
+# Fields per recipe:
+#   id                short stable handle
+#   title             one-line purpose
+#   modality          assay family (multiome | scRNA-seq | ATAC | ...)
+#   engine            the recipe script (relative to repo root)
+#   minimal_wrapper   thin compose-up floor wrapper, if any (else null)
+#   profiles          named --profile presets (else [])
+#   compose_up        implements the compose-up output-composition contract?
+#   provenance_oracle morphic-provenance run that is the parameter-value oracle
+#   status            current | project-wrapper | experimental | deprecated
+#   notes             short qualifier
+version: 1
+
+recipes:
+  - id: multiome
+    title: 10x Multiome (GEX + ATAC) — STAR GeneFull + Chromap ATAC + MACS peaks
+    modality: multiome
+    engine: scripts/run_star_multiome_lane_smoke.sh
+    minimal_wrapper: scripts/run_multiome_minimal.sh
+    profiles: [full, matrices-peaks]
+    compose_up: true
+    provenance_oracle: runs/jax_multiome01
+    status: current
+    notes: >-
+      Compose-up reference recipe. matrices-peaks = apples-to-apples with
+      Cell Ranger ARC --no-bam + a Signac/MACS peak re-call; full = MorPhiC
+      production superset (adds Velocyto + GEX BAM + Y/noY + remote downstream).
+
+  - id: jax-multiome01-production
+    title: MorPhiC jax_multiome01 production wrapper (pins the verified multiome config)
+    modality: multiome
+    engine: scripts/run_jax_multiome01_production.sh
+    minimal_wrapper: null
+    profiles: []
+    compose_up: inherits
+    provenance_oracle: runs/jax_multiome01
+    status: project-wrapper
+    notes: >-
+      Thin project wrapper of the multiome engine with the verified
+      jax_multiome01 production parameters. Use the generic engine for new work.
+
+  - id: scrnaseq-ocm
+    title: 10x scRNA-seq (OCM) production batch — STARsolo GeneFull (+ Velocyto)
+    modality: scRNA-seq
+    engine: scripts/run_jax_scrnaseq02_ocm_production_batch.sh
+    minimal_wrapper: null
+    profiles: []
+    compose_up: false
+    provenance_oracle: runs/jax_scrnaseq02
+    status: current
+    notes: >-
+      Compose-up RETROFIT candidate: Velocyto / BAM / remote downstream are
+      optional layers that should become --profile/flags.
+
+  - id: scrna-downstream
+    title: scRNA downstream — GeneFull+Velocyto h5ad + CellBender (remote, CUDA)
+    modality: scRNA-seq
+    engine: scripts/run_scrna_downstream_gene_full_velocyto.sh
+    minimal_wrapper: null
+    profiles: []
+    compose_up: false
+    provenance_oracle: runs/msk_30ko_revised
+    status: current
+    notes: >-
+      Compose-up RETROFIT candidate: CellBender / remote execution are optional
+      layers. Needs CUDA for CellBender (see AGENTS.md CUDA policy).
+
+# Deliberately NOT catalogued as starting points (kept here for transparency so the
+# starting-point list stays small). These are internal steps, smokes, remote
+# executors, preflight bundles, and uploads — invoked by recipes or for ops, not
+# pipeline entry points.
+excluded:
+  preflight: [run_msk_30ko_fastq_preflight.sh, run_msk_40ko_fastq_preflight.sh]
+  remote_executors:
+    - run_remote_cellbender_batch.sh
+    - run_remote_cellbender_rsync.sh
+    - run_remote_cellbender_scan.sh
+    - run_remote_multiome_post_mex_rsync.sh
+    - run_remote_scrna_downstream_rsync.sh
+  smokes: [run_jax_scrnaseq02_ocm_composite_smoke.sh, run_jax_scrnaseq02_ocm_oracle_smoke.sh, run_multiome_mudata_smoke.sh]
+  ops: [backfill_jax_scrnaseq02_ocm_downstream.sh, upload_jax_multiome01_large_files_globus.sh]
+
+# Recipes/workflows that live in the suite repos rather than here (catalogued by
+# each MCP server's list_workflows; cross-reference, do not duplicate):
+elsewhere:
+  - "STAR-suite/scripts/run_jax_scrnaseq01_flex_2024.sh  (Flex; oracle runs/jax_scrnaseq01)"
+  - "STAR-suite slam_seq_pe recipes  (oracle runs/slam_seq_pe)"
+  - "STAR-suite & Chromap-suite mcp_server/workflows/*.yaml  (lower-level workflow schemas)"

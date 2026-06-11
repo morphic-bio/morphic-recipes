@@ -1,0 +1,14 @@
+# Site localization for the agent_protocol template (agent_protocol.txt).
+#
+# These values fill the ${PROVENANCE_ROOT} / ${RECIPES_ROOT} placeholders in the
+# protocol that each suite MCP server surfaces to agents. The values below are
+# MORPHIC's (this is the reference example + what we use). Other labs: copy this
+# block into a suite server's mcp_server/config.yaml under `locations:` and set
+# your own paths — the methodology text stays the same, only the locations change.
+#
+# Resolution order in a server: config.yaml `locations:`  >  schemas/config.py
+# DEFAULT_LOCATIONS (which mirror the morphic values below).
+
+locations:
+  PROVENANCE_ROOT: /mnt/pikachu/morphic-provenance   # repo of completed-run records (the parameter-value oracle)
+  RECIPES_ROOT: /mnt/pikachu/morphic-recipes         # curated recipe catalog / starting points

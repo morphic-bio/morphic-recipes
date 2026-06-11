@@ -56,3 +56,54 @@ Example: a multiome run was OOM-killed at `--threads 32 --chromap-threads 32`
 with no low-mem flags, while the verified `jax_multiome01` production config was
 `--threads 16 --chromap-threads 16 --chromap-low-mem --chromap-macs3-frag-low-mem`
 and completed the full BAM + Velocyto + noY output set on the same 125 GB machine.
+
+## Compose to the target (start minimal, add only what is needed)
+
+Recipes often emit a **superset** of outputs sized for the heaviest downstream
+(e.g. the MorPhiC production set: GeneFull + Velocyto + GEX BAM + Y/noY +
+fragments + peaks + remote CellBender/MuData). **Do not run the maximal set
+blindly.** Match the outputs to *your* target workflow:
+
+1. **Start from the minimal functional core** — the tested floor that produces
+   the analysis-ready deliverable and nothing else (for multiome:
+   `scripts/run_multiome_minimal.sh`, i.e. GeneFull MEX + ATAC fragments + MACS
+   peaks; apples-to-apples with Cell Ranger ARC `--no-bam` + a Signac/MACS peak
+   re-call).
+2. **Add only the layers your target consumes.** Read the recipe's `COMPOSITION:`
+   header block: it lists each optional add-on with *add when*, *how* (the
+   `--profile`/flag), and the **provenance oracle** for that layer's parameter
+   values.
+3. **Preview with `--dry-run`** — it prints the resolved command and the exact
+   output layers it will emit, then exits without running. Inspect it (or hand it
+   to a human) before the real run or smoke.
+
+Emitting layers the target never uses wastes compute and, in a benchmark, unfairly
+inflates the suite's own time against a comparator that emitted less. Example
+(CAT-ATAC, 2026-06): running the full multiome recipe materialized Velocyto + a
+GEX BAM that the matrices+peaks target (and CR-ARC `--no-bam`) never used; the
+right call was `run_multiome_minimal.sh` / `--profile matrices-peaks`. This is the
+output-composition complement to PROVENANCE-FIRST above: provenance is the oracle
+for *parameter values*; compose-up governs *which output layers* you include.
+
+### Compose-up retrofit backlog (TODO)
+
+Only the **multiome** recipe (`run_star_multiome_lane_smoke.sh` +
+`run_multiome_minimal.sh`) currently implements the full compose-up contract
+(COMPOSITION block, `--profile`, `--dry-run`, minimal wrapper, tiny-fixture smoke).
+Other recipes that have provenance runs emit similar optional supersets
+(Velocyto, CellBender/remote downstream, extra BAMs) and should be reviewed and
+retrofitted the same way. Candidates (from `morphic-provenance/runs/`):
+
+| Recipe / wrapper | Provenance run | Likely optional layers to declare |
+| --- | --- | --- |
+| `run_jax_scrnaseq01_flex_2024.sh` | `jax_scrnaseq01` | BAM, downstream |
+| `run_jax_scrnaseq02_ocm_production_batch.sh` | `jax_scrnaseq02` | Velocyto, BAM, downstream |
+| `run_scrna_downstream_gene_full_velocyto.sh` | `msk_30ko_revised` | Velocyto, CellBender (remote) |
+| `run_msk_40ko_*` | `msk_40ko` | downstream, remote rsync |
+| `run_all_libmacs3_*.sh` | `nw_atac_seq_libmacs3` | BAM vs fragments-only |
+| `run_full_deseq2_modes.sh` | `slam_seq_pe` | DESeq2 modes, remote target |
+
+For each: declare the minimal CORE vs optional ADD-ONs, add `--profile`/`--dry-run`
+and a minimal wrapper, and a tiny-fixture smoke per
+`mcp_server/workflows/AUTHORING.md` "Compose-up recipes". Provenance stays the
+oracle for the parameter values of whatever layers are included.

@@ -15,6 +15,48 @@ set -euo pipefail
 # Running with invented parameters (e.g. --threads 32 --chromap-threads 32 and no
 # low-mem flags) is a known OOM failure mode.
 # ============================================================================
+#
+# === COMPOSITION (compose-up: start minimal, add only what the target needs) =
+# AUTHORING CONTRACT (mcp_server/workflows/AUTHORING.md "Compose-up recipes"):
+# treat this recipe as a MINIMAL functional core plus optional ADD-ON layers.
+# Do NOT blindly run the maximal set. Instead:
+#   1. start from the MINIMAL CORE (the tested floor),
+#   2. ADD only the layers your target workflow actually consumes,
+#   3. take parameter VALUES from the provenance oracle (not invented),
+#   4. --dry-run to preview the resolved command (hand to a human if desired),
+#   5. then smoke / run.
+# Running every layer blindly wastes compute and distorts benchmark comparisons
+# against tools that emitted less (e.g. CR-ARC --no-bam, no RNA-velocity).
+#
+# MINIMAL CORE  (scripts/run_multiome_minimal.sh, == --profile matrices-peaks):
+#   - GeneFull gene x cell MEX (raw + filtered)
+#   - ATAC fragments (possorted BAM) + binary sidecar
+#   - MACS3 narrow peaks + peak x cell MEX
+#   The analysis-ready floor; apples-to-apples with Cell Ranger ARC --no-bam
+#   followed by a Signac/MACS peak re-call.
+#
+# ADD-ON layers  (add when | how | params oracle / docs):
+#   + Velocyto spliced/unspliced/ambiguous MEX
+#       add when: RNA-velocity / transcriptional-dynamics downstream
+#       how:      keep --profile full (default on); matrices-peaks omits it
+#       oracle:   morphic-provenance/runs/jax_multiome01 (verified production set)
+#   + GEX alignment BAM (Aligned.out.bam) + Y/noY GEX sidecars
+#       add when: read-level GEX analysis or Y-removal needed
+#       how:      default on; --no-gex-bam drops it (--outSAMtype None)
+#       docs:     STAR --outSAMtype ; recipe --yremove-format
+#   + ATAC Y/noY BAM sidecars
+#       add when: Y-chromosome-removed ATAC outputs needed
+#       how:      default on; --no-chromap-atac-yremove drops it
+#   + Remote downstream (CellBender, MuData, h5ad)
+#       add when: ambient-RNA removal + joint MuData (needs Velocyto+BAM+GPU)
+#       how:      omit --stop-after-local-mex; set --remote-host/--remote-root
+#       oracle:   morphic-provenance/runs/jax_multiome01 (CellBender/MuData config)
+#
+# PROFILES:  --profile matrices-peaks  = the MINIMAL CORE (compose-up floor)
+#            --profile full (default)   = CORE + every add-on (MorPhiC production)
+# PREVIEW :  --dry-run  prints the resolved command + the composition it will
+#            emit, then exits 0 — inspect (or hand to a human) before running.
+# ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -56,6 +98,10 @@ CHROMAP_MACS3_FRAG_LOW_MEM="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_LOW_MEM:-0}"
 CHROMAP_START_MODE="${STAR_MULTIOME_CHROMAP_START_MODE:-concurrent}"
 SOLO_STRAND="${STAR_MULTIOME_SOLO_STRAND:-Forward}"
 YREMOVE_FORMAT="${STAR_MULTIOME_YREMOVE_FORMAT:-auto}"
+# Composition controls (defaults reproduce the full MorPhiC production output set).
+PROFILE="${STAR_MULTIOME_PROFILE:-full}"
+EMIT_VELOCYTO="${STAR_MULTIOME_EMIT_VELOCYTO:-1}"
+EMIT_GEX_BAM="${STAR_MULTIOME_EMIT_GEX_BAM:-1}"
 ATAC_BARCODE_START="${STAR_MULTIOME_ATAC_BARCODE_START:-9}"
 ATAC_BARCODE_LENGTH="${STAR_MULTIOME_ATAC_BARCODE_LENGTH:-16}"
 ATAC_BARCODE_READ_FORMAT="${STAR_MULTIOME_ATAC_READ_FORMAT:-}"
@@ -71,6 +117,7 @@ ALLOW_LOCAL_DOWNSTREAM="0"
 FORCE="0"
 FORCE_ATAC_BARCODE="0"
 SKIP_BUILD="0"
+DRY_RUN="0"
 STOP_AFTER_LOCAL_MEX="0"
 SOLO_INLINE_HASH="0"
 USE_NATIVE_ATAC_BARCODE="${STAR_MULTIOME_USE_NATIVE_ATAC_BARCODE:-1}"
@@ -115,6 +162,15 @@ Reference/defaults:
   --atac-to-gex PATH        two-column ATAC->GEX barcode translation table
   --solo-strand STR         STARsolo strand (default: Forward)
 
+Composition (output layers — see COMPOSITION block at top of file):
+  --profile NAME            full (default, MorPhiC production superset) |
+                            matrices-peaks (CORE only: GeneFull MEX + ATAC
+                            fragments + MACS peaks; apples-to-apples with
+                            Cell Ranger ARC --no-bam + Signac MACS re-call)
+  --no-velocyto             Drop Velocyto spliced/unspliced/ambiguous MEX
+  --no-gex-bam              Drop GEX Aligned.out.bam (--outSAMtype None) and
+                            GEX Y/noY sidecars (implies --yremove-format none)
+
 Remote downstream:
   --remote-host HOST
   --remote-root PATH
@@ -150,6 +206,9 @@ Other:
   --normalize-atac-barcode  Use the legacy Python barcode FASTQ normalizer fallback
   --python-atac-mex         Use the legacy Python/bedtools ATAC peak-MEX fallback
   --skip-build              Do not rebuild STAR WITH_CHROMAP=1
+  --dry-run                 Resolve + print the composed command and the output
+                            layers it will emit, then exit 0 without running
+                            (implies --skip-build; preview for agent/human review)
   --force                   Regenerate outputs
   --force-atac-barcode      Regenerate normalized ATAC barcode FASTQ
   --solo-inline-hash        Enable STARsolo inline hash mode (off by default)
@@ -178,6 +237,9 @@ while [[ $# -gt 0 ]]; do
     --atac-input-format) ATAC_INPUT_FORMAT="$2"; shift 2 ;;
     --yremove-format) YREMOVE_FORMAT="$2"; shift 2 ;;
     --no-chromap-atac-yremove) CHROMAP_ATAC_YREMOVE="0"; shift ;;
+    --profile) PROFILE="$2"; shift 2 ;;
+    --no-velocyto) EMIT_VELOCYTO="0"; shift ;;
+    --no-gex-bam) EMIT_GEX_BAM="0"; shift ;;
     --chromap-low-mem) CHROMAP_LOW_MEM="1"; shift ;;
     --chromap-low-mem-ram) CHROMAP_LOW_MEM_RAM="$2"; shift 2 ;;
     --chromap-macs3-frag-low-mem) CHROMAP_MACS3_FRAG_LOW_MEM="1"; shift ;;
@@ -202,6 +264,7 @@ while [[ $# -gt 0 ]]; do
     --allow-local-downstream) ALLOW_LOCAL_DOWNSTREAM="1"; shift ;;
     --stop-after-local-mex) STOP_AFTER_LOCAL_MEX="1"; shift ;;
     --skip-build) SKIP_BUILD="1"; shift ;;
+    --dry-run) DRY_RUN="1"; SKIP_BUILD="1"; shift ;;
     --force) FORCE="1"; shift ;;
     --force-atac-barcode) FORCE_ATAC_BARCODE="1"; shift ;;
     --solo-inline-hash) SOLO_INLINE_HASH="1"; shift ;;
@@ -213,6 +276,34 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${OUT_DIR}" ]] || { echo "ERROR: --out-dir is required" >&2; exit 1; }
+
+# --- Resolve composition profile (umbrella preset) and guard combinations ---
+# Defaults reproduce the full MorPhiC production output set; profiles/flags only
+# DROP optional layers. See the COMPOSITION block at the top of this file.
+case "${PROFILE}" in
+  full) ;;
+  matrices-peaks)
+    EMIT_VELOCYTO="0"
+    EMIT_GEX_BAM="0"
+    CHROMAP_ATAC_YREMOVE="0"
+    STOP_AFTER_LOCAL_MEX="1"
+    ;;
+  *) echo "ERROR: --profile must be 'full' or 'matrices-peaks'" >&2; exit 1 ;;
+esac
+case "${EMIT_VELOCYTO}" in 0|1) ;; *) echo "ERROR: EMIT_VELOCYTO must be 0 or 1" >&2; exit 1 ;; esac
+case "${EMIT_GEX_BAM}" in 0|1) ;; *) echo "ERROR: EMIT_GEX_BAM must be 0 or 1" >&2; exit 1 ;; esac
+# Dropping the GEX BAM means there is no GEX alignment stream to emit Y/noY from.
+if [[ "${EMIT_GEX_BAM}" == "0" ]]; then
+  YREMOVE_FORMAT="none"
+fi
+# The remote downstream (CellBender/MuData/RNA-velocity) consumes Velocyto + the
+# GEX BAM; refuse to silently start a downstream-incompatible run.
+if [[ ( "${EMIT_VELOCYTO}" == "0" || "${EMIT_GEX_BAM}" == "0" ) \
+   && "${STOP_AFTER_LOCAL_MEX}" != "1" && -n "${REMOTE_HOST}" ]]; then
+  echo "ERROR: --no-velocyto/--no-gex-bam drop outputs the remote downstream needs;" >&2
+  echo "       use --stop-after-local-mex (or --profile matrices-peaks) for a local matrices/peaks run." >&2
+  exit 1
+fi
 
 case "${GEX_INPUT_FORMAT}" in
   fastq|cbq) ;;
@@ -481,6 +572,21 @@ chromap_yremove_block=""
 if [[ "${CHROMAP_ATAC_YREMOVE}" == "1" ]]; then
   printf -v chromap_yremove_block '  --chromapAtacEmitNoYBam 1 \\\n  --chromapAtacEmitYBam 1 \\\n  --chromapAtacNoYOutput "%s" \\\n  --chromapAtacYOutput "%s" \\\n' "${RUN_DIR}/atac_possorted.noY.bam" "${RUN_DIR}/atac_possorted.Y.bam"
 fi
+# Composition: GeneFull is the CORE RNA feature; Velocyto is an optional layer.
+if [[ "${EMIT_VELOCYTO}" == "1" ]]; then
+  solo_features_line='  --soloFeatures GeneFull Velocyto \'
+else
+  solo_features_line='  --soloFeatures GeneFull \'
+fi
+# Composition: GEX alignment BAM is an optional layer (matrices come from Solo
+# regardless of --outSAMtype). --no-gex-bam also drops the Y/noY block (yremove
+# none). NOTE: the GX/GN SAM attributes require BAM output, so when there is no
+# BAM we must omit --outSAMattributes entirely (else STAR fatal-errors).
+if [[ "${EMIT_GEX_BAM}" == "1" ]]; then
+  printf -v outsam_block '  --outSAMtype BAM Unsorted \\\n  --outSAMattributes NH HI AS nM NM GX GN \\\n'
+else
+  printf -v outsam_block '  --outSAMtype None \\\n'
+fi
 cat > "${STAR_COMMAND}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -491,8 +597,7 @@ set -euo pipefail
 ${gex_read_block}\
   --outFileNamePrefix "${RUN_DIR}/" \\
   --outTmpDir "${SAMPLE_DIR}/tmp" \\
-  --outSAMtype BAM Unsorted \\
-  --outSAMattributes NH HI AS nM NM GX GN \\
+${outsam_block}\
 ${yremove_block}\
   --clipAdapterType CellRanger4 \\
   --clip3pPolyG yes \\
@@ -512,7 +617,7 @@ ${yremove_block}\
   --soloCellFilter EmptyDrops_CR \\
   --soloCbUbRequireTogether no \\
   --soloStrand "${SOLO_STRAND}" \\
-  --soloFeatures GeneFull Velocyto \\
+${solo_features_line}
   --soloCrGexFeature genefull \\
   --soloCrMultimapRescue yes \\
   --soloInlineHashMode "${solo_inline_hash_mode}" \\
@@ -539,6 +644,29 @@ ${chromap_yremove_block}\
 EOF
 chmod +x "${STAR_COMMAND}"
 
+if [[ "${DRY_RUN}" == "1" ]]; then
+  log "DRY RUN — composition preview (no execution)"
+  {
+    echo "=== composition (profile=${PROFILE}) ==="
+    echo "emit_velocyto=${EMIT_VELOCYTO}  emit_gex_bam=${EMIT_GEX_BAM}  atac_yremove=${CHROMAP_ATAC_YREMOVE}  stop_after_local_mex=${STOP_AFTER_LOCAL_MEX}"
+    echo "resources: threads=${THREADS} chromap_threads=${CHROMAP_THREADS} chromap_low_mem=${CHROMAP_LOW_MEM} macs3_frag_low_mem=${CHROMAP_MACS3_FRAG_LOW_MEM} start_mode=${CHROMAP_START_MODE}"
+    echo "genome_dir=${GENOME_DIR}"
+    echo "chromap_ref=${CHROMAP_REF}"
+    echo "chromap_index=${CHROMAP_INDEX}"
+    echo
+    echo "will emit (CORE): GeneFull MEX, ATAC fragments+sidecar, MACS3 peaks + peak MEX"
+    [[ "${EMIT_VELOCYTO}" == "1" ]]       && echo "      + ADD-ON: Velocyto spliced/unspliced/ambiguous MEX"
+    [[ "${EMIT_GEX_BAM}" == "1" ]]        && echo "      + ADD-ON: GEX Aligned.out.bam (+Y/noY: ${YREMOVE_FORMAT})"
+    [[ "${CHROMAP_ATAC_YREMOVE}" == "1" ]] && echo "      + ADD-ON: ATAC Y/noY BAM sidecars"
+    [[ "${STOP_AFTER_LOCAL_MEX}" != "1" ]] && echo "      + ADD-ON: remote downstream (CellBender/MuData/h5ad)"
+    echo
+    echo "=== resolved STAR/Chromap command (${STAR_COMMAND}) ==="
+    cat "${STAR_COMMAND}"
+  } | tee "${OUT_DIR}/DRY_RUN_PREVIEW.txt"
+  log "DRY RUN complete — review ${OUT_DIR}/DRY_RUN_PREVIEW.txt; rerun without --dry-run to execute."
+  exit 0
+fi
+
 if [[ "${FORCE}" == "1" || ! -f "${RUN_DIR}/Log.final.out" || ! -f "${ATAC_BAM}" || ! -f "${ATAC_SIDECAR}" || ! -f "${ATAC_SIDECAR}.chroms.tsv" ]]; then
   log "Running STAR-suite GEX + Chromap ATAC"
   rm -rf "${SAMPLE_DIR}/tmp" "${SAMPLE_DIR}/chromap_tmp"
@@ -558,7 +686,9 @@ else
   log "Reusing packaged GeneFull MEX"
 fi
 
-if [[ ! -f "${RUN_DIR}/outs/velocyto_feature_bc_matrix_manifest.json" \
+if [[ "${EMIT_VELOCYTO}" != "1" ]]; then
+  log "Skipping Velocyto MEX (--no-velocyto / profile matrices-peaks)"
+elif [[ ! -f "${RUN_DIR}/outs/velocyto_feature_bc_matrix_manifest.json" \
   || ! -f "${RUN_DIR}/outs/raw_velocyto_feature_bc_matrix/unspliced.mtx.gz" \
   || ! -f "${RUN_DIR}/outs/filtered_velocyto_feature_bc_matrix/unspliced.mtx.gz" ]]; then
   if [[ "${ALLOW_LEGACY_PREPARE_VELOCYTO}" == "1" ]]; then
@@ -606,8 +736,10 @@ if [[ "${STOP_AFTER_LOCAL_MEX}" == "1" ]]; then
     printf 'run_dir=%s\n' "${RUN_DIR}"
     printf 'rna_raw_mex=%s\n' "${RUN_DIR}/outs/raw_feature_bc_matrix"
     printf 'rna_filtered_mex=%s\n' "${RUN_DIR}/outs/filtered_feature_bc_matrix"
-    printf 'velocyto_raw_mex=%s\n' "${RUN_DIR}/outs/raw_velocyto_feature_bc_matrix"
+    [[ "${EMIT_VELOCYTO}" == "1" ]] && printf 'velocyto_raw_mex=%s\n' "${RUN_DIR}/outs/raw_velocyto_feature_bc_matrix"
+    [[ "${EMIT_GEX_BAM}" == "1" ]] && printf 'gex_bam=%s\n' "${RUN_DIR}/Aligned.out.bam"
     printf 'atac_bam=%s\n' "${ATAC_BAM}"
+    printf 'composition_profile=%s\n' "${PROFILE}"
     printf 'atac_sidecar=%s\n' "${ATAC_SIDECAR}"
     printf 'atac_peaks=%s\n' "${ATAC_PEAKS}"
     printf 'atac_summits=%s\n' "${ATAC_SUMMITS}"

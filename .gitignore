@@ -11,6 +11,10 @@ packets/
 scratch/
 tmp/
 
+# Generated test fixtures (downsampled smoke inputs; regenerate with
+# tests/make_multiome_tiny_fixture.sh)
+tests/fixtures/
+
 # Large/generated data
 *.h5ad
 *.h5

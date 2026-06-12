@@ -1086,3 +1086,20 @@ Keep the production path on this shape only while all are true:
    once the desired final GEX/ATAC cell-call policy is agreed.
 4. Add a compact post-MEX validation report for each `.h5mu`, including layer
    names, modality shapes, barcode intersections, and Y-removal provenance.
+
+## Trimodal extension + finalized cell basis
+
+For the single-pass multiome path with a third (CRISPR-guide) modality, the
+GEX + ATAC + guide GO/NO-GO QC figure is documented in
+[`trimodal-qc.md`](trimodal-qc.md) (`scripts/generate_trimodal_qc.py` renders the
+figure over the MuData; `scripts/build_catatac_trimodal_qc.py` is the CAT-ATAC
+reproducer).
+
+That doc also settles the **finalized cell-call policy** behind Open Task 3 above:
+STARsolo's `outs/filtered_feature_bc_matrix` is the *permissive* EmptyDrops
+candidate set — the knee (`is_simple_cell==1`) **plus** a rescued low-UMI tail
+(18,515 = 12,220 + 6,295 on CAT-ATAC) — not the finalized call. Build the MuData on
+the **knee** (e.g. `build_multiome_mudata.py --filtered-barcodes <knee barcodes>`);
+it matches CR-ARC's joint cells within ~2% (12,220 vs 12,466), whereas the candidate
+set inflates the cell count and deflates per-cell assignment rates. Source of truth:
+`Solo.out/GeneFull/filtered/EmptyDrops/EmptyDrops/summary.json`.

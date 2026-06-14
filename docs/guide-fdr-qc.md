@@ -12,21 +12,22 @@ on A375) stays the **default and the only validated caller**. What this adds is:
 The FDR α is principled (a controlled error rate) but still a *choice*; the **QC is primary** —
 the cutoff ultimately has to fit the biology, not the statistical approximation of it.
 
-## The problem it reacts to: shallow / uneven gRNA capture
+## The situation it helps with: low, uneven guide-UMI depth
 
-This is a reaction to a *common* condition, not a better caller. gRNA-capture libraries are
-frequently shallow and uneven — guides differ by orders of magnitude in capture depth and in
-ambient contamination. A single fixed UMI/mixture-valley threshold cannot serve a library that
-diverse: it is simultaneously too strict for the clean, low-ambient guides and too loose for the
-contaminated ones. The clean fix is a deeper, better-targeted gRNA library; an adaptive per-guide
-cutoff is the salvage when that re-prep isn't an option, and it is unnecessary when the library is
-deep and even.
+This helps with a *common* condition, not a better caller. Guide-UMI depth is often low and varies
+across guides — guides differ by orders of magnitude in capture depth and in ambient contamination.
+A single fixed UMI/mixture-valley threshold cannot serve a library that diverse: it is
+simultaneously too strict for the clean, low-ambient guides and too loose for the contaminated
+ones. Low guide-UMI depth is common — every dataset has a low-depth tail of cells, and
+higher-diversity libraries spread reads thinner — so the adaptive cutoff helps wherever depth is
+low, and is simply unnecessary where depth is high.
 
 Worked numbers (CAT-ATAC K562 DMSO rep1, suite single-pass): per-guide ambient contamination spans
 **~500×**, representation runs **5–672 cells/guide**, per-cell depth is modest (**median 16 guide
 UMIs/cell; only 0.6% lack guide reads**). Assignment is **depth-limited** — it climbs from ~0% below
-5 guide UMIs/cell to ~100% above 30 (where it matches the suite's usual 90+% benchmark regime), so a
-lower overall rate reflects the library's depth, not the caller. The effective per-guide threshold
+5 guide UMIs/cell to ~100% above 30; on the public A375 CRISPR screen (10x `1k_CRISPR_5p_gemx`) the
+same default GMM caller assigns **91.5%** of cells (1,086/1,187), so a lower overall rate reflects
+the library's depth, not the caller (GMM 41% here vs 91.5% on A375). The effective per-guide threshold
 the FDR sets moves **2 → 7 UMIs**, beating the GMM default at every depth band and recovering **+2,807**
 real cells (GMM 4,991 → 7,797 of 12,220) with no re-sequencing. Supplementary figure (4 panels;
 panel C is a double histogram of assignment vs depth): `scripts/fig_grna_library_diversity.py`

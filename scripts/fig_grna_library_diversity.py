@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Supplementary figure: gRNA-capture library diversity is a common problem, and a per-guide
-noise-floor FDR overcomes it. Built from a suite single-pass run's own outputs (GMM root +
-crispr_analysis/ambient_fdr/).
+"""Supplementary figure: guide-UMI depth is often low and uneven, and a per-guide noise-floor FDR
+calls more cells there than a fixed cutoff. Built from a suite single-pass run's own outputs
+(GMM root + crispr_analysis/ambient_fdr/).
 
 Four panels:
-  A. per-guide ambient contamination spans orders of magnitude (the library is uneven)
+  A. per-guide ambient contamination spans orders of magnitude (depth/contamination varies by guide)
   B. one FDR adapts the per-guide UMI threshold to each guide's floor (a fixed cutoff cannot)
-  C. the library is shallow; the cells the FDR recovers are the low-UMI cells a fixed cutoff drops
-  D. outcome: real low-UMI cells recovered without re-sequencing
+  C. assignment is depth-limited (double histogram: depth distribution vs FDR- and GMM-assigned)
+  D. outcome: more cells called from the same data, no re-sequencing
 
-Frames the approach as a reaction to a common condition (shallow / uneven gRNA capture), not a
-better caller. The ideal fix is a deeper, better-targeted gRNA library; this is the salvage when
-that isn't an option. No claim about any published analysis is made or needed.
+Low guide-UMI depth is common (every dataset has a low-depth tail; higher-diversity libraries
+spread reads thinner) — the adaptive cutoff helps wherever it occurs and is simply unnecessary
+where depth is high. No claim about any published analysis is made or needed.
 """
 import argparse
 
@@ -135,8 +135,8 @@ def main() -> None:
     d.set_title("D  Outcome: +%d real low-UMI cells recovered\nfrom the same data (no re-sequencing)" % n_resc)
     d.set_ylim(0, n_knee * 1.12)
 
-    fig.suptitle("Uneven, depth-limited gRNA capture is a common problem — a per-guide noise-floor FDR recovers more than a fixed cutoff",
-                 fontsize=10.5, fontweight="bold")
+    fig.suptitle("Guide-UMI depth is often low and uneven — a per-guide noise-floor FDR calls more cells than a fixed cutoff",
+                 fontsize=11, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(f"{OUT}.png", dpi=200)
     fig.savefig(f"{OUT}.pdf")

@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""One-stop guide QC: an interactive GEX UMAP whose perturbation calls are driven by a single
-FDR slider (the ambient-noise-floor cutoff). The embedding is the GEX manifold (cutoff-independent
-— computed once); only the colouring changes with the FDR, so the q-values are computed once and
-each slider step is a threshold. The live readout shows the chosen q-value and the cells retained.
+"""Exploratory guide QC: a GEX UMAP whose perturbation calls are driven by a single FDR slider
+(the ambient-noise-floor cutoff). The embedding is the GEX manifold (cutoff-independent — computed
+once); only the colouring changes with the FDR, so the q-values are computed once and each slider
+step is a threshold. The live readout shows the chosen q-value and the cells retained.
+
+NOT part of the shipped path (retained as an exploration aid). The production QC is the unified
+trimodal figure (generate_trimodal_qc.py) over the MuData built by build_catatac_trimodal_qc.py,
+with the tunable cutoff carried as guide.layers['qvalue'] (re-call at any alpha = `<= alpha`). The
+FDR is principled but still a choice; the QC is primary -- it must fit the biology. See
+docs/guide-fdr-qc.md.
 
 This is the practitioner-facing answer to "where do I set the cutoff": drag the slider, watch the
 calls and retention update, and the same q-value is what `guide.layers['qvalue'] <= alpha` filters

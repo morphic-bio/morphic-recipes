@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Ambient-FDR CRISPR-guide caller — a per-cell-guide cutoff anchored to the noise floor.
+"""Ambient-FDR guide-call cutoff — a per-cell-guide cutoff anchored to the noise floor.
+
+SUPERSEDED FOR THE PRODUCTION PATH (2026-06): the suite now computes this cutoff IN-BINARY
+(merged STAR-suite 464f394; outputs under outs/crispr_analysis/ambient_fdr/), and the recipe
+build_catatac_trimodal_qc.py reads those q-values directly. This pure-Python implementation is
+kept as a readable reference and for ad-hoc re-calling outside a STAR run. It is a CUTOFF
+ESTIMATOR (emptyDrops construction [Lun 2019] + Poisson guide-background [Replogle 2022; crispat
+2024; CLEANSER 2025]) layered on top of the validated GMM default -- NOT a new caller. The FDR is
+principled but still a choice; the QC is primary. See docs/guide-fdr-qc.md.
+
 
 The cutoff is *not* an arbitrary mixture-model valley. The per-guide ambient (noise) profile is
 the guide's UMI distribution across EMPTY droplets (non-cell barcodes); for each cell-guide the

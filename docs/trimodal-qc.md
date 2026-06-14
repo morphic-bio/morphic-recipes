@@ -17,7 +17,9 @@ This is QC, not biology — stop at the MuData + this figure (+ example downstre
   present, else computes a quick GEX UMAP.
 - **`scripts/build_catatac_trimodal_qc.py`** — *dataset reproducer* (like
   `run_jax_multiome01_production.sh`). Assembles the CAT-ATAC trimodal MuData on the
-  finalized cell basis and calls the generator.
+  finalized cell basis from the suite's OWN single-pass outputs, carrying both guide callers
+  (GMM validated default in `guide.obs['gmm_*']`; the tunable FDR cutoff in `guide.X` +
+  `layers['qvalue']`, read from the binary), and calls the generator. See `guide-fdr-qc.md`.
 
 ## Use it in the multiome path
 
@@ -76,17 +78,21 @@ guide-assignment rate (wrong denominator).
 ## CAT-ATAC worked example (GSE288996, K562 DMSO rep1)
 
 `python3 scripts/build_catatac_trimodal_qc.py` → `catatac_dmso1_trimodal.h5mu` +
-`trimodal_qc.{html,json,png}`. On the finalized cells:
+`trimodal_qc.{html,json,png}`. On the finalized cells (suite's own single-pass output,
+merged binary `464f394`):
 
 | modality | count | note |
 |---|---|---|
 | GEX | 12,220 | EmptyDrops knee; cf. CR-ARC joint 12,466 (~2%) |
 | ATAC | 12,220 | every finalized GEX cell has ATAC |
-| guide-assigned | 4,775 | 39.1% of cells; ~72% of guide-considered (cf. paper ~77%) |
-| triple | 4,775 | the trimodal-cell count |
+| guide — GMM default | 4,991 | the validated CR-compat baseline (stricter) |
+| guide — tunable cutoff @1% FDR | 7,797 | *what the cutoff emits* at the default α, not a validated result |
+| triple | 7,797 | trimodal cells at the default cutoff |
 
-Guide calls here are the study's deposited DMSO1 calls (placeholder); swap for the suite's
-own guide-arm output when it lands — the MuData/QC pipeline is unchanged. Example output:
+Both guide callers are the suite's own (no placeholder): the **GMM validated default** in
+`guide.obs['gmm_*']` and the **tunable FDR cutoff** in `guide.X` + `layers['qvalue']` (read
+from the binary; re-call at any α with `<= α`). The figure shows the calls at the default α
+— it is the *tunable instrument*, not a fixed result. See `guide-fdr-qc.md`. Example output:
 `docs/figures/trimodal_qc_catatac_dmso1.png`.
 
 ## Dependencies

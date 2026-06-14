@@ -80,10 +80,9 @@ def main() -> None:
     g = pd.read_csv(f"{R}/outs/crispr_analysis/protospacer_calls_per_cell.csv"); g["bc"] = s1(g.cell_barcode.astype(str)); g = g.set_index("bc")
     gmm_called = set(g.index[g.feature_call.notna() & (g.feature_call.astype(str) != "None")])
     knee = set(cells)
-    umis = af["num_umis"].reindex(cells).fillna(0).astype(float)
-    grp = pd.Series("no-call", index=cells)
-    grp[[c for c in cells if c in (af_called & gmm_called)]] = "both"
-    grp[[c for c in cells if c in (af_called - gmm_called)]] = "rescued"
+    tot = C.sum(1)                                          # TOTAL guide UMIs per cell (cr_assign)
+    asg = (Q <= ALPHA).any(1)                               # FDR-assigned per cell
+    gmm_b = np.array([c in gmm_called for c in cells])
     n_gmm, n_af, n_knee = len(gmm_called & knee), len(af_called), len(knee)
     n_resc = len(af_called - gmm_called)
 
@@ -112,15 +111,15 @@ def main() -> None:
     plt.colorbar(sc, ax=b, label="eff. UMI threshold", fraction=0.046, pad=0.04)
 
     c = ax[1, 0]
-    bins = np.logspace(0, np.log10(max(umis.max(), 10)), 40)
-    for col_, color, lbl in [("both", C_BOTH, "called by both"), ("rescued", C_RESC, "rescued by FDR cutoff")]:
-        v = umis[grp == col_]; v = v[v > 0]
-        c.hist(v, bins=bins, alpha=0.75, label=lbl, color=color)
-    c.set_xscale("log"); c.set_xlabel("guide UMIs per cell (cells with >0 shown)"); c.set_ylabel("cells")
-    med_all = umis.median(); zero_pct = (umis == 0).mean() * 100
-    c.axvline(max(med_all, 1), ls=":", c="k"); c.text(max(med_all, 1) * 1.06, c.get_ylim()[1] * 0.85, f"overall median {med_all:.0f} UMIs", fontsize=7.5)
-    c.set_title("C  Shallow library (median %.0f UMIs/cell overall; %.0f%% have 0).\nRescued cells are the low-UMI cells a fixed cutoff drops" % (med_all, zero_pct))
-    c.legend(fontsize=8, loc="upper right")
+    med = float(np.median(tot))
+    bins = np.logspace(0, np.log10(max(tot.max(), 10)), 30)
+    c.hist(tot, bins=bins, color="#e2e2e2", label="all knee cells (depth)")
+    c.hist(tot[asg], bins=bins, color=C_RESC, alpha=0.80, label="assigned @ 1%% FDR (%d)" % n_af)
+    c.hist(tot[gmm_b], bins=bins, histtype="step", color=C_BOTH, lw=1.7, label="assigned by GMM default (%d)" % n_gmm)
+    c.set_xscale("log"); c.set_xlabel("total guide UMIs per cell"); c.set_ylabel("cells")
+    c.axvline(med, ls=":", c="k"); c.text(med * 1.06, c.get_ylim()[1] * 0.88, f"median {med:.0f}", fontsize=7.5)
+    c.set_title("C  Assignment is depth-limited (not a calling failure):\nassigned cells fill the deeper bins; the shortfall vs 'all cells' is all low-depth")
+    c.legend(fontsize=7.2, loc="upper right")
 
     d = ax[1, 1]
     labels = ["knee cells\n(finalized)", "GMM default\n(validated)", "FDR cutoff\n@ %g%%" % (ALPHA * 100)]
@@ -136,15 +135,16 @@ def main() -> None:
     d.set_title("D  Outcome: +%d real low-UMI cells recovered\nfrom the same data (no re-sequencing)" % n_resc)
     d.set_ylim(0, n_knee * 1.12)
 
-    fig.suptitle("Shallow / uneven gRNA capture is a common problem — a per-guide noise-floor FDR overcomes it",
-                 fontsize=11.5, fontweight="bold")
+    fig.suptitle("Uneven, depth-limited gRNA capture is a common problem — a per-guide noise-floor FDR recovers more than a fixed cutoff",
+                 fontsize=10.5, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(f"{OUT}.png", dpi=200)
     fig.savefig(f"{OUT}.pdf")
     print(f">> wrote {OUT}.png and {OUT}.pdf")
     print(f"   per-guide ambient {pg.ambient_rate[pg.ambient_rate>0].min():.5f}..{pg.ambient_rate.max():.5f}; "
           f"eff thr {pg.eff_thr.min()}..{pg.eff_thr.max()} UMIs; cells/guide {pg.n_cells.min()}..{pg.n_cells.max()}")
-    print(f"   knee {n_knee}  GMM {n_gmm}  FDR {n_af}  rescued {n_resc}  median {med_all:.0f}  zero {zero_pct:.0f}%")
+    print(f"   knee {n_knee}  GMM {n_gmm}  FDR {n_af}  rescued {n_resc}  "
+          f"median total guide UMIs {np.median(tot):.0f}  zero {(tot==0).mean()*100:.1f}%")
 
 
 if __name__ == "__main__":

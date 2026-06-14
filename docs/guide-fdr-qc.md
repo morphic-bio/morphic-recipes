@@ -23,11 +23,14 @@ cutoff is the salvage when that re-prep isn't an option, and it is unnecessary w
 deep and even.
 
 Worked numbers (CAT-ATAC K562 DMSO rep1, suite single-pass): per-guide ambient contamination spans
-**~500×**, representation runs **5–672 cells/guide**, depth is low (**median 7 guide UMIs/cell, 36%
-at zero**); the effective per-guide threshold the FDR sets moves **2 → 7 UMIs**, recovering **+2,807**
-real low-UMI cells a fixed cutoff would drop (GMM default 4,991 → 7,797 of 12,220), no re-sequencing.
-Supplementary figure: `scripts/fig_grna_library_diversity.py` (`--run-dir <star_run> --out-prefix
-<path>`) → `supp_grna_library_diversity.{png,pdf}`.
+**~500×**, representation runs **5–672 cells/guide**, per-cell depth is modest (**median 16 guide
+UMIs/cell; only 0.6% lack guide reads**). Assignment is **depth-limited** — it climbs from ~0% below
+5 guide UMIs/cell to ~100% above 30 (where it matches the suite's usual 90+% benchmark regime), so a
+lower overall rate reflects the library's depth, not the caller. The effective per-guide threshold
+the FDR sets moves **2 → 7 UMIs**, beating the GMM default at every depth band and recovering **+2,807**
+real cells (GMM 4,991 → 7,797 of 12,220) with no re-sequencing. Supplementary figure (4 panels;
+panel C is a double histogram of assignment vs depth): `scripts/fig_grna_library_diversity.py`
+(`--run-dir <star_run> --out-prefix <path>`) → `supp_grna_library_diversity.{png,pdf}`.
 
 ## The cutoff: an FDR-controlled noise floor (established methodology, cited — not ours)
 

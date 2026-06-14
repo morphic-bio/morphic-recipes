@@ -12,6 +12,23 @@ on A375) stays the **default and the only validated caller**. What this adds is:
 The FDR α is principled (a controlled error rate) but still a *choice*; the **QC is primary** —
 the cutoff ultimately has to fit the biology, not the statistical approximation of it.
 
+## The problem it reacts to: shallow / uneven gRNA capture
+
+This is a reaction to a *common* condition, not a better caller. gRNA-capture libraries are
+frequently shallow and uneven — guides differ by orders of magnitude in capture depth and in
+ambient contamination. A single fixed UMI/mixture-valley threshold cannot serve a library that
+diverse: it is simultaneously too strict for the clean, low-ambient guides and too loose for the
+contaminated ones. The clean fix is a deeper, better-targeted gRNA library; an adaptive per-guide
+cutoff is the salvage when that re-prep isn't an option, and it is unnecessary when the library is
+deep and even.
+
+Worked numbers (CAT-ATAC K562 DMSO rep1, suite single-pass): per-guide ambient contamination spans
+**~500×**, representation runs **5–672 cells/guide**, depth is low (**median 7 guide UMIs/cell, 36%
+at zero**); the effective per-guide threshold the FDR sets moves **2 → 7 UMIs**, recovering **+2,807**
+real low-UMI cells a fixed cutoff would drop (GMM default 4,991 → 7,797 of 12,220), no re-sequencing.
+Supplementary figure: `scripts/fig_grna_library_diversity.py` (`--run-dir <star_run> --out-prefix
+<path>`) → `supp_grna_library_diversity.{png,pdf}`.
+
 ## The cutoff: an FDR-controlled noise floor (established methodology, cited — not ours)
 
 - The per-guide **ambient/noise floor** is the guide's UMI profile across **empty droplets**

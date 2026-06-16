@@ -32,6 +32,7 @@ INPUT_FORMAT="${STAR_MULTIOME_INPUT_FORMAT:-fastq}"
 CHROMAP_LOW_MEM="${STAR_MULTIOME_CHROMAP_LOW_MEM:-1}"
 CHROMAP_LOW_MEM_RAM="${STAR_MULTIOME_CHROMAP_LOW_MEM_RAM:-0}"
 CHROMAP_MACS3_FRAG_LOW_MEM="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_LOW_MEM:-1}"
+CHROMAP_MACS3_FRAG_QVALUE="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_QVALUE:-0}"
 CHROMAP_START_MODE="${STAR_MULTIOME_CHROMAP_START_MODE:-concurrent}"
 CELLBENDER_CPU_CORES="${MULTIOME_CELLBENDER_CPU_CORES:-24}"
 CELLBENDER_GPU="1"
@@ -77,6 +78,10 @@ Options:
   --chromap-low-mem
   --chromap-low-mem-ram N
   --chromap-macs3-frag-low-mem
+  --chromap-macs3-frag-qvalue Q
+                           Use MACS3 FRAG q-value/FDR peak selection in the
+                           local sidecar peak-MEX step; 0 preserves default
+                           p-value mode (default: 0)
   --chromap-start-mode MODE
                            STAR/Chromap scheduling: postMapping or concurrent
                            (default: concurrent)
@@ -115,6 +120,7 @@ while [[ $# -gt 0 ]]; do
     --chromap-low-mem) CHROMAP_LOW_MEM="1"; shift ;;
     --chromap-low-mem-ram) CHROMAP_LOW_MEM_RAM="$2"; shift 2 ;;
     --chromap-macs3-frag-low-mem) CHROMAP_MACS3_FRAG_LOW_MEM="1"; shift ;;
+    --chromap-macs3-frag-qvalue) CHROMAP_MACS3_FRAG_QVALUE="$2"; shift 2 ;;
     --chromap-start-mode) CHROMAP_START_MODE="$2"; shift 2 ;;
     --cellbender-cpu-cores) CELLBENDER_CPU_CORES="$2"; shift 2 ;;
     --no-cellbender-gpu) CELLBENDER_GPU="0"; shift ;;
@@ -150,6 +156,21 @@ case "${INPUT_FORMAT}" in
   fastq|cbq) ;;
   *) echo "ERROR: --input-format must be fastq or cbq" >&2; exit 1 ;;
 esac
+if ! python3 - "${CHROMAP_MACS3_FRAG_QVALUE}" <<'PY'
+import math
+import sys
+
+try:
+    q = float(sys.argv[1])
+except ValueError:
+    raise SystemExit(1)
+if math.isnan(q) or q < 0.0 or q > 1.0:
+    raise SystemExit(1)
+PY
+then
+  echo "ERROR: --chromap-macs3-frag-qvalue must be 0 (disabled) or in (0, 1]" >&2
+  exit 1
+fi
 
 mkdir -p "${OUTPUT_ROOT}/metadata" "${OUTPUT_ROOT}/logs" "${OUTPUT_ROOT}/samples"
 MANIFEST="${OUTPUT_ROOT}/metadata/sample_manifest.tsv"
@@ -340,6 +361,13 @@ while IFS=$'\t' read -r sample sample_slug atac_lib gex_lib gex_r1 gex_r2 atac_r
   fi
   [[ "${CHROMAP_LOW_MEM}" == "1" ]] && args+=(--chromap-low-mem)
   [[ "${CHROMAP_MACS3_FRAG_LOW_MEM}" == "1" ]] && args+=(--chromap-macs3-frag-low-mem)
+  if python3 - "${CHROMAP_MACS3_FRAG_QVALUE}" <<'PY'
+import sys
+raise SystemExit(0 if float(sys.argv[1]) > 0.0 else 1)
+PY
+  then
+    args+=(--chromap-macs3-frag-qvalue "${CHROMAP_MACS3_FRAG_QVALUE}")
+  fi
   [[ "${FORCE}" == "1" ]] && args+=(--force)
 
   "${args[@]}" 2>&1 | tee "${sample_log}"

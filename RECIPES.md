@@ -17,7 +17,7 @@
 
 ## Notes
 
-- **multiome** — Compose-up reference recipe. matrices-peaks = apples-to-apples with Cell Ranger ARC --no-bam + a Signac/MACS peak re-call; full = MorPhiC production superset (adds Velocyto + GEX BAM + Y/noY + remote downstream).
+- **multiome** — Compose-up reference recipe. matrices-peaks = apples-to-apples with Cell Ranger ARC --no-bam + a Signac/MACS peak re-call; full = MorPhiC production superset (adds Velocyto + GEX BAM + Y/noY + remote downstream). Optional --chromap-macs3-frag-qvalue enables libchromap/MACS3 q-value peak selection without changing the default p-value mode.
 - **jax-multiome01-production** — Thin project wrapper of the multiome engine with the verified jax_multiome01 production parameters. Use the generic engine for new work.
 - **scrnaseq-ocm** — Compose-up RETROFIT candidate: Velocyto / BAM / remote downstream are optional layers that should become --profile/flags.
 - **scrna-downstream** — Compose-up RETROFIT candidate: CellBender / remote execution are optional layers. Needs CUDA for CellBender (see AGENTS.md CUDA policy).

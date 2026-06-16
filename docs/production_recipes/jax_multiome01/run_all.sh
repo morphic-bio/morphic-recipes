@@ -18,6 +18,7 @@ THREADS="${STAR_MULTIOME_THREADS:-16}"
 CHROMAP_THREADS="${STAR_MULTIOME_CHROMAP_THREADS:-16}"
 INPUT_FORMAT="${STAR_MULTIOME_INPUT_FORMAT:-fastq}"
 CHROMAP_START_MODE="${STAR_MULTIOME_CHROMAP_START_MODE:-concurrent}"
+CHROMAP_MACS3_FRAG_QVALUE="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_QVALUE:-0}"
 GENOME_DIR="${STAR_MULTIOME_GENOME_DIR:-/storage/autoindex_110_44/bulk_index}"
 GEX_WHITELIST="${STAR_MULTIOME_GEX_WHITELIST:-/mnt/pikachu/atac-seq/10xMultiome/pbmc_unsorted_3k/open_source_full_20260424_015259/refs/737K-arc-v1_gex.txt}"
 CHROMAP_REF="${STAR_MULTIOME_CHROMAP_REF:-/storage/autoindex_110_44/bulk_index/cellranger_ref/genome.fa}"
@@ -92,6 +93,10 @@ Run options:
                            manifest with gex_cbq, atac_read_pair_cbq, and
                            atac_barcode_cbq columns.
   --chromap-start-mode MODE
+  --chromap-macs3-frag-qvalue Q
+                           Use MACS3 FRAG q-value/FDR peak selection in local
+                           ATAC peak-MEX materialization; 0 preserves default
+                           p-value mode (default: 0)
   --genome-dir PATH
   --gex-whitelist PATH
   --chromap-ref PATH
@@ -137,6 +142,7 @@ while [[ $# -gt 0 ]]; do
     --chromap-threads) CHROMAP_THREADS="$2"; shift 2 ;;
     --input-format) INPUT_FORMAT="$2"; shift 2 ;;
     --chromap-start-mode) CHROMAP_START_MODE="$2"; shift 2 ;;
+    --chromap-macs3-frag-qvalue) CHROMAP_MACS3_FRAG_QVALUE="$2"; shift 2 ;;
     --genome-dir) GENOME_DIR="$2"; shift 2 ;;
     --gex-whitelist) GEX_WHITELIST="$2"; shift 2 ;;
     --chromap-ref) CHROMAP_REF="$2"; shift 2 ;;
@@ -369,6 +375,24 @@ production_args=(
   --chromap-macs3-frag-low-mem
   --chromap-start-mode "${CHROMAP_START_MODE}"
 )
+if python3 - "${CHROMAP_MACS3_FRAG_QVALUE}" <<'PY'
+import math
+import sys
+
+try:
+    q = float(sys.argv[1])
+except ValueError:
+    raise SystemExit(2)
+if math.isnan(q) or q < 0.0 or q > 1.0:
+    raise SystemExit(2)
+raise SystemExit(0 if q > 0.0 else 1)
+PY
+then
+  production_args+=(--chromap-macs3-frag-qvalue "${CHROMAP_MACS3_FRAG_QVALUE}")
+elif [[ "$?" == "2" ]]; then
+  echo "ERROR: --chromap-macs3-frag-qvalue must be 0 (disabled) or in (0, 1]" >&2
+  exit 1
+fi
 [[ "${SYNC_IMAGES}" != "1" ]] && production_args+=(--no-sync-images)
 [[ "${KEEP_REMOTE}" == "1" ]] && production_args+=(--keep-remote)
 [[ "${FORCE}" == "1" ]] && production_args+=(--force)

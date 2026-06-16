@@ -95,6 +95,7 @@ ATAC_TO_GEX="${STAR_MULTIOME_ATAC_TO_GEX:-/mnt/pikachu/atac-seq/benchmarks/pbmc_
 CHROMAP_LOW_MEM="${STAR_MULTIOME_CHROMAP_LOW_MEM:-0}"
 CHROMAP_LOW_MEM_RAM="${STAR_MULTIOME_CHROMAP_LOW_MEM_RAM:-0}"
 CHROMAP_MACS3_FRAG_LOW_MEM="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_LOW_MEM:-0}"
+CHROMAP_MACS3_FRAG_QVALUE="${STAR_MULTIOME_CHROMAP_MACS3_FRAG_QVALUE:-0}"
 CHROMAP_START_MODE="${STAR_MULTIOME_CHROMAP_START_MODE:-concurrent}"
 SOLO_STRAND="${STAR_MULTIOME_SOLO_STRAND:-Forward}"
 YREMOVE_FORMAT="${STAR_MULTIOME_YREMOVE_FORMAT:-auto}"
@@ -196,6 +197,10 @@ Other:
   --chromap-low-mem-ram N  RAM threshold in bytes for low-memory spill; 0 uses Chromap defaults
   --chromap-macs3-frag-low-mem
                            Enable low-memory MACS3 fragment peak workspace
+  --chromap-macs3-frag-qvalue Q
+                           Use MACS3 FRAG q-value/FDR peak selection for the
+                           sidecar peak-MEX call; 0 disables and preserves the
+                           libchromap default p-value threshold (default: 0)
   --chromap-start-mode MODE
                            STAR/Chromap scheduling: postMapping or concurrent
                            (default: concurrent)
@@ -243,6 +248,7 @@ while [[ $# -gt 0 ]]; do
     --chromap-low-mem) CHROMAP_LOW_MEM="1"; shift ;;
     --chromap-low-mem-ram) CHROMAP_LOW_MEM_RAM="$2"; shift 2 ;;
     --chromap-macs3-frag-low-mem) CHROMAP_MACS3_FRAG_LOW_MEM="1"; shift ;;
+    --chromap-macs3-frag-qvalue) CHROMAP_MACS3_FRAG_QVALUE="$2"; shift 2 ;;
     --chromap-start-mode) CHROMAP_START_MODE="$2"; shift 2 ;;
     --genome-dir) GENOME_DIR="$2"; shift 2 ;;
     --gex-whitelist) GEX_WHITELIST="$2"; shift 2 ;;
@@ -510,6 +516,30 @@ for numeric_name in THREADS CHROMAP_THREADS CHROMAP_LOW_MEM CHROMAP_LOW_MEM_RAM 
     exit 1
   fi
 done
+if ! python3 - "${CHROMAP_MACS3_FRAG_QVALUE}" <<'PY'
+import math
+import sys
+
+try:
+    q = float(sys.argv[1])
+except ValueError:
+    raise SystemExit(1)
+if math.isnan(q) or q < 0.0 or q > 1.0:
+    raise SystemExit(1)
+PY
+then
+  echo "ERROR: --chromap-macs3-frag-qvalue must be 0 (disabled) or in (0, 1]" >&2
+  exit 1
+fi
+
+ATAC_PEAK_THRESHOLD_ARGS=()
+if python3 - "${CHROMAP_MACS3_FRAG_QVALUE}" <<'PY'
+import sys
+raise SystemExit(0 if float(sys.argv[1]) > 0.0 else 1)
+PY
+then
+  ATAC_PEAK_THRESHOLD_ARGS+=(--macs3-frag-qvalue "${CHROMAP_MACS3_FRAG_QVALUE}")
+fi
 
 if [[ "${USE_NATIVE_ATAC_BARCODE}" != "1" && ( "${FORCE_ATAC_BARCODE}" == "1" || ! -f "${ATAC_BC_NORM}" ) ]]; then
   log "Normalizing ATAC barcode FASTQ"
@@ -649,7 +679,7 @@ if [[ "${DRY_RUN}" == "1" ]]; then
   {
     echo "=== composition (profile=${PROFILE}) ==="
     echo "emit_velocyto=${EMIT_VELOCYTO}  emit_gex_bam=${EMIT_GEX_BAM}  atac_yremove=${CHROMAP_ATAC_YREMOVE}  stop_after_local_mex=${STOP_AFTER_LOCAL_MEX}"
-    echo "resources: threads=${THREADS} chromap_threads=${CHROMAP_THREADS} chromap_low_mem=${CHROMAP_LOW_MEM} macs3_frag_low_mem=${CHROMAP_MACS3_FRAG_LOW_MEM} start_mode=${CHROMAP_START_MODE}"
+    echo "resources: threads=${THREADS} chromap_threads=${CHROMAP_THREADS} chromap_low_mem=${CHROMAP_LOW_MEM} macs3_frag_low_mem=${CHROMAP_MACS3_FRAG_LOW_MEM} macs3_frag_qvalue=${CHROMAP_MACS3_FRAG_QVALUE} start_mode=${CHROMAP_START_MODE}"
     echo "genome_dir=${GENOME_DIR}"
     echo "chromap_ref=${CHROMAP_REF}"
     echo "chromap_index=${CHROMAP_INDEX}"
@@ -718,6 +748,7 @@ if [[ "${FORCE}" == "1" || ! -f "${ATAC_MEX}/matrix.mtx.gz" || ! -f "${ATAC_METR
       --out-dir "${ATAC_MEX}" \
       --metrics-tsv "${ATAC_METRICS}" \
       --threads "${CHROMAP_THREADS}" \
+      "${ATAC_PEAK_THRESHOLD_ARGS[@]}" \
       --temp-dir "${SAMPLE_DIR}/chromap_tmp"
     )
     [[ "${FORCE}" == "1" ]] && atac_mex_args+=(--force)
@@ -743,6 +774,7 @@ if [[ "${STOP_AFTER_LOCAL_MEX}" == "1" ]]; then
     printf 'atac_sidecar=%s\n' "${ATAC_SIDECAR}"
     printf 'atac_peaks=%s\n' "${ATAC_PEAKS}"
     printf 'atac_summits=%s\n' "${ATAC_SUMMITS}"
+    printf 'chromap_macs3_frag_qvalue=%s\n' "${CHROMAP_MACS3_FRAG_QVALUE}"
     printf 'atac_mex=%s\n' "${ATAC_MEX}"
     printf 'atac_metrics=%s\n' "${ATAC_METRICS}"
     printf 'post_mex_boundary=local_star_chromap_matrices_ready\n'
@@ -875,6 +907,7 @@ PY
   printf 'chromap_low_mem=%s\n' "${CHROMAP_LOW_MEM}"
   printf 'chromap_low_mem_ram=%s\n' "${CHROMAP_LOW_MEM_RAM}"
   printf 'chromap_macs3_frag_low_mem=%s\n' "${CHROMAP_MACS3_FRAG_LOW_MEM}"
+  printf 'chromap_macs3_frag_qvalue=%s\n' "${CHROMAP_MACS3_FRAG_QVALUE}"
   printf 'atac_whitelist=%s\n' "${ATAC_WHITELIST}"
   printf 'atac_to_gex=%s\n' "${ATAC_TO_GEX}"
   printf 'solo_strand=%s\n' "${SOLO_STRAND}"

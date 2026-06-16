@@ -34,6 +34,8 @@ recipes:
       Compose-up reference recipe. matrices-peaks = apples-to-apples with
       Cell Ranger ARC --no-bam + a Signac/MACS peak re-call; full = MorPhiC
       production superset (adds Velocyto + GEX BAM + Y/noY + remote downstream).
+      Optional --chromap-macs3-frag-qvalue enables libchromap/MACS3 q-value
+      peak selection without changing the default p-value mode.
 
   - id: jax-multiome01-production
     title: MorPhiC jax_multiome01 production wrapper (pins the verified multiome config)

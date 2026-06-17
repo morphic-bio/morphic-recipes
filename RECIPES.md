@@ -14,6 +14,10 @@
 | jax-multiome01-production | MorPhiC jax_multiome01 production wrapper (pins the verified multiome config) | multiome | `scripts/run_jax_multiome01_production.sh` | — | — | inherits | runs/jax_multiome01 | project-wrapper |
 | scrnaseq-ocm | 10x scRNA-seq (OCM) production batch — STARsolo GeneFull (+ Velocyto) | scRNA-seq | `scripts/run_jax_scrnaseq02_ocm_production_batch.sh` | — | — | — | runs/jax_scrnaseq02 | current |
 | scrna-downstream | scRNA downstream — GeneFull+Velocyto h5ad + CellBender (remote, CUDA) | scRNA-seq | `scripts/run_scrna_downstream_gene_full_velocyto.sh` | — | — | — | runs/msk_30ko_revised | current |
+| catatac-trimodal-e2e-smoke | CAT-ATAC trimodal downsample E2E — RNA + ATAC + guide | trimodal | `scripts/run_catatac_trimodal_downsample_smoke.sh` | — | — | ✓ | multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md | current |
+| dogma-hiv-four-arm-e2e-smoke | DOGMA-HIV four-arm downsample E2E — RNA + ATAC + ADT + HIV state | four-ome | `scripts/run_hiv_dogma_four_arm_downsample_smoke.sh` | — | — | ✓ | multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md | current |
+| trimodal-qc-report | Trimodal MuData QC report — RNA + ATAC + guide | multiomics-report | `scripts/generate_trimodal_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | current |
+| four-factor-qc-report | Four-factor MuData QC report — RNA + ATAC + protein + identity | multiomics-report | `scripts/generate_four_factor_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | current |
 
 ## Notes
 
@@ -21,6 +25,10 @@
 - **jax-multiome01-production** — Thin project wrapper of the multiome engine with the verified jax_multiome01 production parameters. Use the generic engine for new work.
 - **scrnaseq-ocm** — Compose-up RETROFIT candidate: Velocyto / BAM / remote downstream are optional layers that should become --profile/flags.
 - **scrna-downstream** — Compose-up RETROFIT candidate: CellBender / remote execution are optional layers. Needs CUDA for CellBender (see AGENTS.md CUDA policy).
+- **catatac-trimodal-e2e-smoke** — Paper-facing L1 reproducibility smoke. Runs the STAR-suite CAT-ATAC trimodal harness on a 100k downsample and then runs the standalone Signac/MACS BED-profile ATAC peak-MEX pass from the sidecar.
+- **dogma-hiv-four-arm-e2e-smoke** — Paper-facing L1 reproducibility smoke. Materializes matched physical first-N FASTQs for all FASTQ arms, runs the STAR-suite DOGMA table-backed four-arm harness, and then runs the standalone Signac/MACS BED-profile ATAC peak-MEX pass from the sidecar.
+- **trimodal-qc-report** — Downstream-from-MuData report recipe for the L4 agentic composability surface. It renders the unified trimodal QC from an assembled MuData object.
+- **four-factor-qc-report** — Downstream-from-MuData report recipe for the L4 agentic composability surface. It renders protein-aware four-factor QC from an assembled MuData object with optional guide/hash/state identity modalities.
 
 ## Not catalogued as starting points
 

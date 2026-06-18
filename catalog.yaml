@@ -132,6 +132,21 @@ recipes:
       surface. It renders protein-aware four-factor QC from an assembled MuData
       object with optional guide/hash/state identity modalities.
 
+  - id: multiome-mudata-builder
+    title: Multiome MuData builder — RNA + ATAC plus optional protein/guide/hash/state
+    modality: multiomics-builder
+    engine: scripts/build_multiome_mudata.py
+    minimal_wrapper: null
+    profiles: []
+    compose_up: true
+    provenance_oracle: multiomics-suite/docs/runbooks/RUNBOOK_MULTIOME_MEX_MUDATA_20260516.md
+    status: current
+    notes: >-
+      Public object-assembly recipe for Multiomics Suite outputs. Builds MuData
+      from RNA and ATAC MEX inputs and can add protein/ADT, CRISPR guide,
+      HTO/hash, and table-backed state modalities with feature-library
+      provenance.
+
 # Deliberately NOT catalogued as starting points (kept here for transparency so the
 # starting-point list stays small). These are internal steps, smokes, remote
 # executors, preflight bundles, and uploads — invoked by recipes or for ops, not

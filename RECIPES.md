@@ -18,6 +18,7 @@
 | dogma-hiv-four-arm-e2e-smoke | DOGMA-HIV four-arm downsample E2E — RNA + ATAC + ADT + HIV state | four-ome | `scripts/run_hiv_dogma_four_arm_downsample_smoke.sh` | — | — | ✓ | multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md | current |
 | trimodal-qc-report | Trimodal MuData QC report — RNA + ATAC + guide | multiomics-report | `scripts/generate_trimodal_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | current |
 | four-factor-qc-report | Four-factor MuData QC report — RNA + ATAC + protein + identity | multiomics-report | `scripts/generate_four_factor_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | current |
+| multiome-mudata-builder | Multiome MuData builder — RNA + ATAC plus optional protein/guide/hash/state | multiomics-builder | `scripts/build_multiome_mudata.py` | — | — | ✓ | multiomics-suite/docs/runbooks/RUNBOOK_MULTIOME_MEX_MUDATA_20260516.md | current |
 
 ## Notes
 
@@ -29,6 +30,7 @@
 - **dogma-hiv-four-arm-e2e-smoke** — Paper-facing L1 reproducibility smoke. Materializes matched physical first-N FASTQs for all FASTQ arms, runs the STAR-suite DOGMA table-backed four-arm harness, and then runs the standalone Signac/MACS BED-profile ATAC peak-MEX pass from the sidecar.
 - **trimodal-qc-report** — Downstream-from-MuData report recipe for the L4 agentic composability surface. It renders the unified trimodal QC from an assembled MuData object.
 - **four-factor-qc-report** — Downstream-from-MuData report recipe for the L4 agentic composability surface. It renders protein-aware four-factor QC from an assembled MuData object with optional guide/hash/state identity modalities.
+- **multiome-mudata-builder** — Public object-assembly recipe for Multiomics Suite outputs. Builds MuData from RNA and ATAC MEX inputs and can add protein/ADT, CRISPR guide, HTO/hash, and table-backed state modalities with feature-library provenance.
 
 ## Not catalogued as starting points
 

@@ -8,17 +8,17 @@
 > oracle for parameter *values*; a recipe's `--profile`/compose-up governs which
 > output *layers* it emits. See AGENTS.md "Compose to the target".
 
-| id | recipe | modality | engine | minimal wrapper | profiles | compose-up | provenance oracle | status |
-|---|---|---|---|---|---|---|---|---|
-| multiome | 10x Multiome (GEX + ATAC) — STAR GeneFull + Chromap ATAC + MACS peaks | multiome | `scripts/run_star_multiome_lane_smoke.sh` | `scripts/run_multiome_minimal.sh` | full, matrices-peaks | ✓ | runs/jax_multiome01 | current |
-| jax-multiome01-production | MorPhiC jax_multiome01 production wrapper (pins the verified multiome config) | multiome | `scripts/run_jax_multiome01_production.sh` | — | — | inherits | runs/jax_multiome01 | project-wrapper |
-| scrnaseq-ocm | 10x scRNA-seq (OCM) production batch — STARsolo GeneFull (+ Velocyto) | scRNA-seq | `scripts/run_jax_scrnaseq02_ocm_production_batch.sh` | — | — | — | runs/jax_scrnaseq02 | current |
-| scrna-downstream | scRNA downstream — GeneFull+Velocyto h5ad + CellBender (remote, CUDA) | scRNA-seq | `scripts/run_scrna_downstream_gene_full_velocyto.sh` | — | — | — | runs/msk_30ko_revised | current |
-| catatac-trimodal-e2e-smoke | CAT-ATAC trimodal downsample E2E — RNA + ATAC + guide | trimodal | `scripts/run_catatac_trimodal_downsample_smoke.sh` | — | — | ✓ | multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md | current |
-| dogma-hiv-four-arm-e2e-smoke | DOGMA-HIV four-arm downsample E2E — RNA + ATAC + ADT + HIV state | four-ome | `scripts/run_hiv_dogma_four_arm_downsample_smoke.sh` | — | — | ✓ | multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md | current |
-| trimodal-qc-report | Trimodal MuData QC report — RNA + ATAC + guide | multiomics-report | `scripts/generate_trimodal_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | current |
-| four-factor-qc-report | Four-factor MuData QC report — RNA + ATAC + protein + identity | multiomics-report | `scripts/generate_four_factor_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | current |
-| multiome-mudata-builder | Multiome MuData builder — RNA + ATAC plus optional protein/guide/hash/state | multiomics-builder | `scripts/build_multiome_mudata.py` | — | — | ✓ | multiomics-suite/docs/runbooks/RUNBOOK_MULTIOME_MEX_MUDATA_20260516.md | current |
+| id | recipe | modality | engine | minimal wrapper | profiles | compose-up | provenance oracle | composition examples | status |
+|---|---|---|---|---|---|---|---|---|---|
+| multiome | 10x Multiome (GEX + ATAC) — STAR GeneFull + Chromap ATAC + MACS peaks | multiome | `scripts/run_star_multiome_lane_smoke.sh` | `scripts/run_multiome_minimal.sh` | full, matrices-peaks | ✓ | runs/jax_multiome01 | composition_morphic_jax_multiome01_20260517t183219z_star_multiome_prod_globus | current |
+| jax-multiome01-production | MorPhiC jax_multiome01 production wrapper (pins the verified multiome config) | multiome | `scripts/run_jax_multiome01_production.sh` | — | — | inherits | runs/jax_multiome01 | composition_morphic_jax_multiome01_20260517t183219z_star_multiome_prod_globus | project-wrapper |
+| scrnaseq-ocm | 10x scRNA-seq (OCM) production batch — STARsolo GeneFull (+ Velocyto) | scRNA-seq | `scripts/run_jax_scrnaseq02_ocm_production_batch.sh` | — | — | — | runs/jax_scrnaseq02 | composition_morphic_jax_scrnaseq02_20260522t135526z_ocm_prod_handoff | current |
+| scrna-downstream | scRNA downstream — GeneFull+Velocyto h5ad + CellBender (remote, CUDA) | scRNA-seq | `scripts/run_scrna_downstream_gene_full_velocyto.sh` | — | — | — | runs/msk_30ko_revised | — | current |
+| catatac-trimodal-e2e-smoke | CAT-ATAC trimodal downsample E2E — RNA + ATAC + guide | trimodal | `scripts/run_catatac_trimodal_downsample_smoke.sh` | — | — | ✓ | multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md | — | current |
+| dogma-hiv-four-arm-e2e-smoke | DOGMA-HIV four-arm downsample E2E — RNA + ATAC + ADT + HIV state | four-ome | `scripts/run_hiv_dogma_four_arm_downsample_smoke.sh` | — | — | ✓ | multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md | — | current |
+| trimodal-qc-report | Trimodal MuData QC report — RNA + ATAC + guide | multiomics-report | `scripts/generate_trimodal_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | — | current |
+| four-factor-qc-report | Four-factor MuData QC report — RNA + ATAC + protein + identity | multiomics-report | `scripts/generate_four_factor_qc.py` | — | — | ✓ | multiomics-suite downstream MuData report recipes | — | current |
+| multiome-mudata-builder | Multiome MuData builder — RNA + ATAC plus optional protein/guide/hash/state | multiomics-builder | `scripts/build_multiome_mudata.py` | — | — | ✓ | multiomics-suite/docs/runbooks/RUNBOOK_MULTIOME_MEX_MUDATA_20260516.md | — | current |
 
 ## Notes
 

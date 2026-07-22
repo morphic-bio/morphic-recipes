@@ -16,9 +16,16 @@
 #   profiles          named --profile presets (else [])
 #   compose_up        implements the compose-up output-composition contract?
 #   provenance_oracle morphic-provenance run that is the parameter-value oracle
+#   composition_examples evidence-backed Workbench graph references (else [])
 #   status            current | project-wrapper | experimental | deprecated
 #   notes             short qualifier
 version: 1
+
+composition_evidence:
+  schema: morphic.composition_evidence_catalog/v1
+  repository: git@github.com:BioDepot/agentic-workbench.git
+  path: examples/composition_evidence/catalog.json
+  runbook: docs/RUNBOOK_COMPOSITION_EVIDENCE_CATALOG.md
 
 recipes:
   - id: multiome
@@ -29,6 +36,10 @@ recipes:
     profiles: [full, matrices-peaks]
     compose_up: true
     provenance_oracle: runs/jax_multiome01
+    composition_examples:
+      - graph_id: composition_morphic_jax_multiome01_20260517t183219z_star_multiome_prod_globus
+        evidence_kind: observed_provenance
+        provenance_run: runs/jax_multiome01/20260517T183219Z_star_multiome_prod_globus
     status: current
     notes: >-
       Compose-up reference recipe. matrices-peaks = apples-to-apples with
@@ -45,6 +56,10 @@ recipes:
     profiles: []
     compose_up: inherits
     provenance_oracle: runs/jax_multiome01
+    composition_examples:
+      - graph_id: composition_morphic_jax_multiome01_20260517t183219z_star_multiome_prod_globus
+        evidence_kind: observed_provenance
+        provenance_run: runs/jax_multiome01/20260517T183219Z_star_multiome_prod_globus
     status: project-wrapper
     notes: >-
       Thin project wrapper of the multiome engine with the verified
@@ -58,6 +73,10 @@ recipes:
     profiles: []
     compose_up: false
     provenance_oracle: runs/jax_scrnaseq02
+    composition_examples:
+      - graph_id: composition_morphic_jax_scrnaseq02_20260522t135526z_ocm_prod_handoff
+        evidence_kind: observed_provenance
+        provenance_run: runs/jax_scrnaseq02/20260522T135526Z_ocm_prod_handoff
     status: current
     notes: >-
       Compose-up RETROFIT candidate: Velocyto / BAM / remote downstream are
@@ -71,6 +90,7 @@ recipes:
     profiles: []
     compose_up: false
     provenance_oracle: runs/msk_30ko_revised
+    composition_examples: []
     status: current
     notes: >-
       Compose-up RETROFIT candidate: CellBender / remote execution are optional
@@ -84,6 +104,7 @@ recipes:
     profiles: []
     compose_up: true
     provenance_oracle: multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md
+    composition_examples: []
     status: current
     notes: >-
       Paper-facing L1 reproducibility smoke. Runs the STAR-suite CAT-ATAC
@@ -98,6 +119,7 @@ recipes:
     profiles: []
     compose_up: true
     provenance_oracle: multiomics-suite/docs/datasets/e2e_downsample_smoke_runs_20260617.md
+    composition_examples: []
     status: current
     notes: >-
       Paper-facing L1 reproducibility smoke. Materializes matched physical
@@ -113,6 +135,7 @@ recipes:
     profiles: []
     compose_up: true
     provenance_oracle: multiomics-suite downstream MuData report recipes
+    composition_examples: []
     status: current
     notes: >-
       Downstream-from-MuData report recipe for the L4 agentic composability
@@ -126,6 +149,7 @@ recipes:
     profiles: []
     compose_up: true
     provenance_oracle: multiomics-suite downstream MuData report recipes
+    composition_examples: []
     status: current
     notes: >-
       Downstream-from-MuData report recipe for the L4 agentic composability
@@ -140,6 +164,7 @@ recipes:
     profiles: []
     compose_up: true
     provenance_oracle: multiomics-suite/docs/runbooks/RUNBOOK_MULTIOME_MEX_MUDATA_20260516.md
+    composition_examples: []
     status: current
     notes: >-
       Public object-assembly recipe for Multiomics Suite outputs. Builds MuData

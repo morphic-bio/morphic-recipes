@@ -32,6 +32,7 @@ COLUMNS = [
     ("profiles", "profiles"),
     ("compose_up", "compose-up"),
     ("provenance_oracle", "provenance oracle"),
+    ("composition_examples", "composition examples"),
     ("status", "status"),
 ]
 
@@ -54,6 +55,16 @@ def compose_badge(value) -> str:
     if value is False:
         return "—"
     return str(value)  # e.g. "inherits"
+
+
+def composition_examples(value) -> str:
+    if not isinstance(value, list):
+        return ""
+    return ", ".join(
+        str(item.get("graph_id") or "") if isinstance(item, dict) else str(item)
+        for item in value
+        if (item.get("graph_id") if isinstance(item, dict) else item)
+    )
 
 
 def render_markdown(cat: dict) -> str:
@@ -79,6 +90,8 @@ def render_markdown(cat: dict) -> str:
         for key, _ in COLUMNS:
             if key == "compose_up":
                 cells.append(compose_badge(r.get(key)))
+            elif key == "composition_examples":
+                cells.append(composition_examples(r.get(key)) or "—")
             elif key in ("engine", "minimal_wrapper"):
                 v = fmt(r.get(key))
                 cells.append(f"`{v}`" if v else "—")
@@ -135,11 +148,16 @@ def render_xlsx(cat: dict) -> None:
     for r in recipes:
         row = []
         for key, _ in COLUMNS:
-            row.append(compose_badge(r.get(key)) if key == "compose_up" else fmt(r.get(key)))
+            if key == "compose_up":
+                row.append(compose_badge(r.get(key)))
+            elif key == "composition_examples":
+                row.append(composition_examples(r.get(key)))
+            else:
+                row.append(fmt(r.get(key)))
         row.append(" ".join(fmt(r.get("notes")).split()))
         ws.append(row)
     # column widths + wrap notes
-    widths = [16, 46, 12, 42, 34, 22, 11, 22, 16, 60]
+    widths = [16, 46, 12, 42, 34, 22, 11, 22, 48, 16, 60]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
     for row in ws.iter_rows(min_row=2):

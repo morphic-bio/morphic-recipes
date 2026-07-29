@@ -149,50 +149,77 @@ def render_qc(mdata: md.MuData, output_prefix: str, args: argparse.Namespace) ->
     triple = int((qc.get("atac_inpeak", pd.Series(index=qc.index)).notna() & assigned_mask).sum())
     rate = 100 * n_assigned / max(n_gex, 1)
 
-    fig = make_subplots(rows=2, cols=3, subplot_titles=(
-        "GEX: UMIs vs genes (color=%mito)", "ATAC: in-peak depth vs #peaks",
-        "Guide: assignment status", "Cells per modality / overlap",
-        "Joint UMAP — guide (perturbation)", "Joint UMAP — ATAC depth"))
+    # Portrait 3x2 layout: colorbar panels (GEX, ATAC, UMAP-depth) fill the right
+    # column so colorbars stack down the right edge; bars + guide UMAP fill the
+    # left column; guide legend goes below.
+    ROWS, COLS, VS = 3, 2, 0.10
+    _rh = (1.0 - (ROWS - 1) * VS) / ROWS
+    row_center = {r: 1.0 - (r - 1) * (_rh + VS) - _rh / 2 for r in range(1, ROWS + 1)}
 
-    fig.add_trace(go.Scattergl(x=qc.gex_umis, y=qc.gex_genes, mode="markers",
-        marker=dict(size=3, color=qc.gex_pct_mito, colorscale="Viridis", cmax=20, cmin=0,
-                    colorbar=dict(title="%mito", len=0.4, y=0.8, x=0.30)), showlegend=False), 1, 1)
-    fig.update_xaxes(type="log", row=1, col=1, title="UMIs"); fig.update_yaxes(type="log", row=1, col=1, title="genes")
+    def cbar(row, title):
+        return dict(title=dict(text=title, side="right", font=dict(size=12)),
+                    tickfont=dict(size=11), x=1.005, xanchor="left",
+                    y=row_center[row], yanchor="middle", len=_rh * 0.9, thickness=12)
 
-    if "atac_inpeak" in qc:
-        fig.add_trace(go.Scattergl(x=qc.atac_inpeak, y=qc.atac_npeaks, mode="markers",
-            marker=dict(size=3, color=(qc[frip] if frip else qc.atac_inpeak), colorscale="Cividis",
-                        colorbar=dict(title=("FRiP" if frip else "depth"), len=0.4, y=0.8, x=0.63)),
-            showlegend=False), 1, 2)
-        fig.update_xaxes(type="log", row=1, col=2, title="in-peak fragments"); fig.update_yaxes(type="log", row=1, col=2, title="# peaks")
+    fig = make_subplots(rows=ROWS, cols=COLS, vertical_spacing=VS, horizontal_spacing=0.15,
+        subplot_titles=(
+            "Cells per modality / overlap", "GEX: UMIs vs genes (color=%mito)",
+            "Guide: assignment status", "ATAC: in-peak depth vs #peaks",
+            "Joint UMAP — guide (perturbation)", "Joint UMAP — ATAC depth"))
+    MS = 4
 
-    vc = qc["guide_status"].value_counts()
-    fig.add_trace(go.Bar(x=vc.index.tolist(), y=vc.values.tolist(), showlegend=False,
-        marker_color=["#2ca02c", "#1f77b4", "#ff7f0e", "#999999"][:len(vc)]), 1, 3)
-
+    # (1,1) cells per modality / overlap
     fig.add_trace(go.Bar(x=["GEX", "ATAC", "guide-assigned", "triple"],
         y=[n_gex, n_atac, n_assigned, triple], showlegend=False,
-        marker_color=["#1f77b4", "#9467bd", "#2ca02c", "#000000"]), 2, 1)
+        marker_color=["#1f77b4", "#9467bd", "#2ca02c", "#000000"]), 1, 1)
+    fig.update_yaxes(title="cells", row=1, col=1)
 
+    # (1,2) GEX
+    fig.add_trace(go.Scattergl(x=qc.gex_umis, y=qc.gex_genes, mode="markers",
+        marker=dict(size=MS, color=qc.gex_pct_mito, colorscale="Viridis", cmax=20, cmin=0,
+                    colorbar=cbar(1, "%mito")), showlegend=False), 1, 2)
+    fig.update_xaxes(type="log", row=1, col=2, title="UMIs"); fig.update_yaxes(type="log", row=1, col=2, title="genes")
+
+    # (2,1) guide assignment status
+    vc = qc["guide_status"].value_counts()
+    fig.add_trace(go.Bar(x=vc.index.tolist(), y=vc.values.tolist(), showlegend=False,
+        marker_color=["#2ca02c", "#1f77b4", "#ff7f0e", "#999999"][:len(vc)]), 2, 1)
+
+    # (2,2) ATAC
+    if "atac_inpeak" in qc:
+        fig.add_trace(go.Scattergl(x=qc.atac_inpeak, y=qc.atac_npeaks, mode="markers",
+            marker=dict(size=MS, color=(qc[frip] if frip else qc.atac_inpeak), colorscale="Cividis",
+                        colorbar=cbar(2, "FRiP" if frip else "depth")),
+            showlegend=False), 2, 2)
+        fig.update_xaxes(type="log", row=2, col=2, title="in-peak fragments"); fig.update_yaxes(type="log", row=2, col=2, title="# peaks")
+
+    # (3,1) joint UMAP — guide
     sub = qc.dropna(subset=["umap1"])
     topg = sub.loc[sub.guide_status == "singlet", "assigned_gene"].value_counts().head(8).index.tolist()
     for gene in topg:
         s = sub[sub.assigned_gene == gene]
         fig.add_trace(go.Scattergl(x=s.umap1, y=s.umap2, mode="markers", name=gene,
-            marker=dict(size=3), legendgroup="g"), 2, 2)
+            marker=dict(size=MS), legendgroup="g"), 3, 1)
     bg = sub[~sub.assigned_gene.isin(topg)]
     fig.add_trace(go.Scattergl(x=bg.umap1, y=bg.umap2, mode="markers", name="other/none",
-        marker=dict(size=2, color="#dddddd"), legendgroup="g"), 2, 2)
+        marker=dict(size=3, color="#dddddd"), legendgroup="g"), 3, 1)
 
+    # (3,2) joint UMAP — ATAC depth
     cvar = qc[frip] if frip else qc.get("atac_inpeak")
     if cvar is not None:
         fig.add_trace(go.Scattergl(x=sub.umap1, y=sub.umap2, mode="markers", showlegend=False,
-            marker=dict(size=3, color=cvar.reindex(sub.index), colorscale="Cividis",
-                        colorbar=dict(title=("FRiP" if frip else "ATAC depth"), len=0.4, y=0.2, x=1.0))), 2, 3)
+            marker=dict(size=MS, color=cvar.reindex(sub.index), colorscale="Cividis",
+                        colorbar=cbar(3, "FRiP" if frip else "ATAC depth"))), 3, 2)
 
-    fig.update_layout(height=820, width=1500, template="plotly_white", legend=dict(itemsizing="constant"),
-        title_text=(f"{args.title}. GEX={n_gex}, ATAC={n_atac}, "
-                    f"guide-assigned={n_assigned} ({rate:.1f}%), triple={triple}"))
+    fig.update_layout(height=1000, width=820, template="plotly_white",
+        font=dict(size=15),
+        legend=dict(itemsizing="constant", font=dict(size=12), orientation="h",
+                    yanchor="top", y=-0.05, xanchor="center", x=0.5),
+        margin=dict(l=78, r=112, t=92, b=80),
+        title=dict(text=(f"{args.title}<br>GEX={n_gex}, ATAC={n_atac}, "
+                    f"guide-assigned={n_assigned} ({rate:.1f}%), triple={triple}"),
+                   font=dict(size=15), x=0.5, xanchor="center", y=0.99, yanchor="top"))
+    fig.update_annotations(font_size=13)
 
     out = Path(output_prefix)
     out.parent.mkdir(parents=True, exist_ok=True)

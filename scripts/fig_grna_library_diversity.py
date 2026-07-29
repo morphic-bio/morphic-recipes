@@ -86,8 +86,11 @@ def main() -> None:
     n_gmm, n_af, n_knee = len(gmm_called & knee), len(af_called), len(knee)
     n_resc = len(af_called - gmm_called)
 
-    plt.rcParams.update({"font.size": 9, "axes.titlesize": 9.5, "axes.titleweight": "bold"})
-    fig, ax = plt.subplots(2, 2, figsize=(11, 8.2))
+    plt.rcParams.update({"font.size": 10, "axes.titlesize": 10, "axes.titleweight": "bold",
+                         "axes.labelsize": 10, "xtick.labelsize": 9, "ytick.labelsize": 9,
+                         "legend.fontsize": 9})
+    NLIB = len(mgn)  # total guides in the capture library
+    fig, ax = plt.subplots(2, 2, figsize=(7.2, 6.0))
     C_BOTH, C_RESC = "#2c7fb8", "#d95f0e"
 
     a = ax[0, 0]
@@ -95,19 +98,19 @@ def main() -> None:
     floor = r[r > 0].min() / 3.0
     r[r <= 0] = floor
     a.bar(np.arange(len(r)), r, color="#41719c", width=0.9)
-    a.set_yscale("log"); a.set_xlabel("guides, ranked by ambient rate (n=%d)" % len(r)); a.set_ylabel("ambient rate (UMI fraction in empties)")
-    a.set_title("A  gRNA libraries are uneven:\nper-guide ambient contamination spans ~%.0f×" % (pg.ambient_rate[pg.ambient_rate > 0].max() / pg.ambient_rate[pg.ambient_rate > 0].min()))
+    a.set_yscale("log"); a.set_xlabel("guides, ranked by ambient rate (n=%d of %d)" % (len(r), NLIB)); a.set_ylabel("ambient rate (UMI fraction in empties)")
+    a.set_title("A  gRNA libraries are uneven (~%.0f×)" % (pg.ambient_rate[pg.ambient_rate > 0].max() / pg.ambient_rate[pg.ambient_rate > 0].min()))
     hi = pg.nlargest(1, "ambient_rate").iloc[0]
-    a.annotate(f"dirtiest {hi.guide}", (len(r) - 1, hi.ambient_rate), xytext=(len(r) * 0.42, hi.ambient_rate * 0.7), fontsize=7.5, color="#b30000")
+    a.annotate(f"dirtiest {hi.guide}", (len(r) - 1, hi.ambient_rate), xytext=(len(r) * 0.36, hi.ambient_rate * 0.55), fontsize=9, color="#b30000")
 
     b = ax[0, 1]
     x = pg.ambient_rate.values.copy(); x[x <= 0] = floor
     sc = b.scatter(x, pg.eff_thr, s=8 + pg.n_cells / 8, c=pg.eff_thr, cmap="viridis", edgecolor="k", linewidth=0.3, zorder=3)
     b.set_xscale("log"); b.set_xlabel("per-guide ambient rate"); b.set_ylabel("UMIs needed to be called @ %g%% FDR" % (ALPHA * 100))
-    b.axhline(3, ls="--", c="#888", lw=1); b.text(b.get_xlim()[0], 3.12, " fixed UMI≥3 (CR default)", fontsize=7, color="#555")
-    b.axhline(10, ls="--", c="#888", lw=1); b.text(b.get_xlim()[0], 10.15, " fixed UMI≥10 (CR A375 parity)", fontsize=7, color="#555")
+    b.axhline(3, ls="--", c="#888", lw=1); b.text(b.get_xlim()[0], 3.18, " fixed UMI≥3 (CR default)", fontsize=8.5, color="#555")
+    b.axhline(10, ls="--", c="#888", lw=1); b.text(b.get_xlim()[0], 10.2, " fixed UMI≥10 (CR A375 parity)", fontsize=8.5, color="#555")
     b.set_ylim(0, 12)
-    b.set_title("B  One FDR adapts the per-guide threshold (%d→%d UMIs)\nto each guide's floor — a fixed cutoff cannot" % (pg.eff_thr.min(), pg.eff_thr.max()))
+    b.set_title("B  Threshold adapts per guide (%d→%d UMIs)" % (pg.eff_thr.min(), pg.eff_thr.max()))
     plt.colorbar(sc, ax=b, label="eff. UMI threshold", fraction=0.046, pad=0.04)
 
     c = ax[1, 0]
@@ -117,9 +120,9 @@ def main() -> None:
     c.hist(tot[asg], bins=bins, color=C_RESC, alpha=0.80, label="assigned @ 1%% FDR (%d)" % n_af)
     c.hist(tot[gmm_b], bins=bins, histtype="step", color=C_BOTH, lw=1.7, label="assigned by GMM default (%d)" % n_gmm)
     c.set_xscale("log"); c.set_xlabel("total guide UMIs per cell"); c.set_ylabel("cells")
-    c.axvline(med, ls=":", c="k"); c.text(med * 1.06, c.get_ylim()[1] * 0.88, f"median {med:.0f}", fontsize=7.5)
-    c.set_title("C  Assignment is depth-limited (not a calling failure):\nassigned cells fill the deeper bins; the shortfall vs 'all cells' is all low-depth")
-    c.legend(fontsize=7.2, loc="upper right")
+    c.axvline(med, ls=":", c="k"); c.text(med * 1.08, c.get_ylim()[1] * 0.86, f"median {med:.0f}", fontsize=8.5)
+    c.set_title("C  Assignment is depth-limited")
+    c.legend(fontsize=8.5, loc="upper right")
 
     d = ax[1, 1]
     labels = ["knee cells\n(finalized)", "GMM default\n(validated)", "FDR cutoff\n@ %g%%" % (ALPHA * 100)]
@@ -129,15 +132,13 @@ def main() -> None:
     d.bar(2, n_resc, bottom=n_gmm, color=C_RESC, label="rescued (low-UMI)")
     d.set_xticks([0, 1, 2]); d.set_xticklabels(labels)
     for i, v in [(0, n_knee), (1, n_gmm), (2, n_af)]:
-        d.text(i, v + 180, f"{v:,}", ha="center", fontsize=8.5, fontweight="bold")
-    d.text(2, n_gmm + n_resc / 2, f"+{n_resc:,}", ha="center", va="center", fontsize=8, color="white", fontweight="bold")
-    d.set_ylabel("cells"); d.legend(fontsize=7.5, loc="upper right")
-    d.set_title("D  Outcome: +%d real low-UMI cells recovered\nfrom the same data (no re-sequencing)" % n_resc)
+        d.text(i, v + 180, f"{v:,}", ha="center", fontsize=9.5, fontweight="bold")
+    d.text(2, n_gmm + n_resc / 2, f"+{n_resc:,}", ha="center", va="center", fontsize=9, color="white", fontweight="bold")
+    d.set_ylabel("cells"); d.legend(fontsize=8.5, loc="upper right")
+    d.set_title("D  +%d cells recovered, same data" % n_resc)
     d.set_ylim(0, n_knee * 1.12)
 
-    fig.suptitle("Guide-UMI depth is often low and uneven — a per-guide noise-floor FDR calls more cells than a fixed cutoff",
-                 fontsize=11, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.tight_layout()
     fig.savefig(f"{OUT}.png", dpi=200)
     fig.savefig(f"{OUT}.pdf")
     print(f">> wrote {OUT}.png and {OUT}.pdf")

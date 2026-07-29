@@ -390,161 +390,134 @@ def render_qc(mdata: md.MuData, output_prefix: str, args: argparse.Namespace) ->
     qc, summary = compute_qc(mdata, args)
     ensure_umap(mdata, qc, args)
 
+    # Portrait 4x2 layout: all four colorbar panels in the right column so the
+    # colorbars stack down the right edge (one per row) without overlapping; the
+    # four bar/UMAP panels fill the left column. Identity legend goes below.
+    ROWS, COLS, VS = 4, 2, 0.09
+    _rh = (1.0 - (ROWS - 1) * VS) / ROWS
+    row_center = {r: 1.0 - (r - 1) * (_rh + VS) - _rh / 2 for r in range(1, ROWS + 1)}
+
+    def cbar(row: int, title: str) -> dict:
+        return dict(title=dict(text=title, side="right", font=dict(size=12)),
+                    tickfont=dict(size=11), x=1.005, xanchor="left",
+                    y=row_center[row], yanchor="middle", len=_rh * 0.92, thickness=12)
+
     fig = make_subplots(
-        rows=2,
-        cols=4,
+        rows=ROWS, cols=COLS, vertical_spacing=VS, horizontal_spacing=0.15,
         subplot_titles=(
-            "GEX: UMIs vs genes",
-            "ATAC: in-peak depth vs peaks",
-            "Protein: UMIs vs detected ADTs",
-            "Identity assignment status",
-            "Cells per modality / overlap",
-            "UMAP: protein marker",
-            "UMAP: identity",
-            "Protein: signal vs isotype background",
+            "Cells per modality / overlap", "GEX: UMIs vs genes",
+            "Identity assignment status", "ATAC: in-peak depth vs peaks",
+            "UMAP: identity", "Protein: UMIs vs detected ADTs",
+            "Protein: signal vs isotype background", "UMAP: protein marker",
         ),
     )
+    MS = 5
 
+    # (1,1) cells per modality / overlap
+    fig.add_trace(
+        go.Bar(
+            x=["RNA/ATAC", "protein", "identity present", "4-factor", "4-factor assigned"],
+            y=[summary["n_atac_cells"], summary["n_protein_barcodes_present"],
+               summary["n_identity_barcodes_present"], summary["n_four_factor_overlap"],
+               summary["n_four_factor_assigned"]],
+            showlegend=False,
+            marker_color=["#4c78a8", "#f58518", "#54a24b", "#000000", "#b279a2"],
+        ), 1, 1)
+    fig.update_yaxes(title="cells", row=1, col=1)
+
+    # (1,2) GEX: UMIs vs genes
     fig.add_trace(
         go.Scattergl(
-            x=np.maximum(qc["gex_umis"], 1),
-            y=np.maximum(qc["gex_genes"], 1),
-            mode="markers",
-            marker=dict(size=4, color=qc["gex_pct_mito"], colorscale="Viridis", colorbar=dict(title="%mito")),
+            x=np.maximum(qc["gex_umis"], 1), y=np.maximum(qc["gex_genes"], 1), mode="markers",
+            marker=dict(size=MS, color=qc["gex_pct_mito"], colorscale="Viridis", colorbar=cbar(1, "%mito")),
             showlegend=False,
-        ),
-        1,
-        1,
-    )
-    fig.update_xaxes(type="log", title="UMIs", row=1, col=1)
-    fig.update_yaxes(type="log", title="genes", row=1, col=1)
+        ), 1, 2)
+    fig.update_xaxes(type="log", title="UMIs", row=1, col=2)
+    fig.update_yaxes(type="log", title="genes", row=1, col=2)
 
+    # (2,1) identity assignment status
+    status_order = ["not_in_identity_set", "unassigned", "singlet", "multiplet"]
+    status_disp = {"not_in_identity_set": "not in set", "unassigned": "unassigned",
+                   "singlet": "singlet", "multiplet": "multiplet"}
+    status_counts = qc["identity_status"].value_counts().reindex(status_order).fillna(0).astype(int)
+    fig.add_trace(
+        go.Bar(x=[status_disp.get(s, s) for s in status_counts.index], y=status_counts.values.tolist(),
+               showlegend=False, marker_color="#4c78a8"),
+        2, 1)
+
+    # (2,2) ATAC: in-peak depth vs peaks
     if "atac_inpeak" in qc:
         atac_color = qc["atac_frip"] if "atac_frip" in qc else qc["atac_inpeak"]
         fig.add_trace(
             go.Scattergl(
-                x=np.maximum(qc["atac_inpeak"].fillna(0), 1),
-                y=np.maximum(qc["atac_npeaks"].fillna(0), 1),
-                mode="markers",
-                marker=dict(size=4, color=atac_color, colorscale="Cividis", colorbar=dict(title="FRiP" if "atac_frip" in qc else "depth")),
+                x=np.maximum(qc["atac_inpeak"].fillna(0), 1), y=np.maximum(qc["atac_npeaks"].fillna(0), 1), mode="markers",
+                marker=dict(size=MS, color=atac_color, colorscale="Cividis",
+                            colorbar=cbar(2, "FRiP" if "atac_frip" in qc else "depth")),
                 showlegend=False,
-            ),
-            1,
-            2,
-        )
-        fig.update_xaxes(type="log", title="in-peak fragments", row=1, col=2)
-        fig.update_yaxes(type="log", title="peaks", row=1, col=2)
+            ), 2, 2)
+        fig.update_xaxes(type="log", title="in-peak fragments", row=2, col=2)
+        fig.update_yaxes(type="log", title="peaks", row=2, col=2)
     else:
-        add_empty_panel(fig, 1, 2, "ATAC modality not present")
+        add_empty_panel(fig, 2, 2, "ATAC modality not present")
 
+    # (3,1) UMAP: identity
+    add_identity_umap(fig, qc, 3, 1)
+
+    # (3,2) Protein: UMIs vs detected ADTs
     if "protein_umis" in qc:
         fig.add_trace(
             go.Scattergl(
-                x=np.maximum(qc["protein_umis"], 1),
-                y=np.maximum(qc["protein_features_detected"], 1),
-                mode="markers",
-                marker=dict(size=4, color=qc["protein_top_feature_fraction"], colorscale="Teal", colorbar=dict(title="top fraction")),
+                x=np.maximum(qc["protein_umis"], 1), y=np.maximum(qc["protein_features_detected"], 1), mode="markers",
+                marker=dict(size=MS, color=qc["protein_top_feature_fraction"], colorscale="Teal", colorbar=cbar(3, "top fraction")),
                 showlegend=False,
-            ),
-            1,
-            3,
-        )
-        fig.update_xaxes(type="log", title="protein UMIs", row=1, col=3)
-        fig.update_yaxes(type="log", title="detected proteins", row=1, col=3)
+            ), 3, 2)
+        fig.update_xaxes(type="log", title="protein UMIs", row=3, col=2)
+        fig.update_yaxes(type="log", title="detected proteins", row=3, col=2)
     else:
-        add_empty_panel(fig, 1, 3, "Protein modality not present")
+        add_empty_panel(fig, 3, 2, "Protein modality not present")
 
-    status_order = ["not_in_identity_set", "unassigned", "singlet", "multiplet"]
-    status_counts = qc["identity_status"].value_counts().reindex(status_order).fillna(0).astype(int)
-    fig.add_trace(
-        go.Bar(x=status_counts.index.tolist(), y=status_counts.values.tolist(), showlegend=False, marker_color="#4c78a8"),
-        1,
-        4,
-    )
+    # (4,1) protein: signal vs isotype background
+    if "protein_specific_total" in qc and "protein_isotype_total" in qc:
+        present = qc["protein_present"].astype(bool)
+        xx = np.maximum(qc.loc[present, "protein_isotype_total"].fillna(0), 1)
+        yy = np.maximum(qc.loc[present, "protein_specific_total"].fillna(0), 1)
+        fig.add_trace(go.Scattergl(x=xx, y=yy, mode="markers", marker=dict(size=MS, color="#54a24b"), showlegend=False), 4, 1)
+        hi = float(max(yy.max() if len(yy) else 10, xx.max() if len(xx) else 10, 10))
+        fig.add_trace(go.Scatter(x=[1, hi], y=[1, hi], mode="lines", line=dict(color="#888888", dash="dash"), showlegend=False), 4, 1)
+        fig.update_xaxes(type="log", title="isotype-control UMIs (background)", row=4, col=1)
+        fig.update_yaxes(type="log", title="specific-antibody UMIs", row=4, col=1)
+    else:
+        add_empty_panel(fig, 4, 1, "No protein modality for isotype QC")
 
-    fig.add_trace(
-        go.Bar(
-            x=["RNA/ATAC", "protein", "identity present", "4-factor", "4-factor assigned"],
-            y=[
-                summary["n_atac_cells"],
-                summary["n_protein_barcodes_present"],
-                summary["n_identity_barcodes_present"],
-                summary["n_four_factor_overlap"],
-                summary["n_four_factor_assigned"],
-            ],
-            showlegend=False,
-            marker_color=["#4c78a8", "#f58518", "#54a24b", "#000000", "#b279a2"],
-        ),
-        2,
-        1,
-    )
-    fig.update_yaxes(title="cells", row=2, col=1)
-
+    # (4,2) UMAP: protein marker
     protein_marker = summary["protein_marker"]
     marker_col = f"protein_marker_{protein_marker}" if protein_marker else ""
     sub = qc.dropna(subset=["umap1", "umap2"])
     if marker_col in qc:
         fig.add_trace(
             go.Scattergl(
-                x=sub["umap1"],
-                y=sub["umap2"],
-                mode="markers",
-                marker=dict(size=4, color=qc.loc[sub.index, marker_col], colorscale="Magma", colorbar=dict(title=protein_marker)),
+                x=sub["umap1"], y=sub["umap2"], mode="markers",
+                marker=dict(size=MS, color=qc.loc[sub.index, marker_col], colorscale="Magma", colorbar=cbar(4, protein_marker)),
                 showlegend=False,
-            ),
-            2,
-            2,
-        )
+            ), 4, 2)
     else:
-        add_empty_panel(fig, 2, 2, "No protein marker selected")
-
-    add_identity_umap(fig, qc, 2, 3)
-
-    if "protein_specific_total" in qc and "protein_isotype_total" in qc:
-        present = qc["protein_present"].astype(bool)
-        xx = np.maximum(qc.loc[present, "protein_isotype_total"].fillna(0), 1)
-        yy = np.maximum(qc.loc[present, "protein_specific_total"].fillna(0), 1)
-        fig.add_trace(
-            go.Scattergl(
-                x=xx,
-                y=yy,
-                mode="markers",
-                marker=dict(size=4, color="#54a24b"),
-                showlegend=False,
-            ),
-            2,
-            4,
-        )
-        hi = float(max(yy.max() if len(yy) else 10, xx.max() if len(xx) else 10, 10))
-        fig.add_trace(
-            go.Scatter(
-                x=[1, hi],
-                y=[1, hi],
-                mode="lines",
-                line=dict(color="#888888", dash="dash"),
-                showlegend=False,
-            ),
-            2,
-            4,
-        )
-        fig.update_xaxes(type="log", title="isotype-control UMIs (background)", row=2, col=4)
-        fig.update_yaxes(type="log", title="specific-antibody UMIs", row=2, col=4)
-    else:
-        add_empty_panel(fig, 2, 4, "No protein modality for isotype QC")
+        add_empty_panel(fig, 4, 2, "No protein marker selected")
 
     overlap_rate = 100 * summary["n_four_factor_overlap"] / max(summary["n_rna_cells"], 1)
     assigned_rate = 100 * summary["n_four_factor_assigned"] / max(summary["n_rna_cells"], 1)
     fig.update_layout(
-        height=900,
-        width=1800,
-        template="plotly_white",
-        legend=dict(itemsizing="constant"),
-        title_text=(
-            f"{args.title}. cells={summary['n_rna_cells']}, "
-            f"4-factor={summary['n_four_factor_overlap']} ({overlap_rate:.1f}%), "
-            f"assigned={summary['n_four_factor_assigned']} ({assigned_rate:.1f}%)"
-        ),
+        height=1180, width=820, template="plotly_white",
+        font=dict(size=15),
+        legend=dict(itemsizing="constant", font=dict(size=12), orientation="h",
+                    yanchor="top", y=-0.035, xanchor="center", x=0.5),
+        margin=dict(l=78, r=112, t=92, b=72),
+        title=dict(
+            text=(f"{args.title}<br>cells={summary['n_rna_cells']}, "
+                  f"4-factor={summary['n_four_factor_overlap']} ({overlap_rate:.1f}%), "
+                  f"assigned={summary['n_four_factor_assigned']} ({assigned_rate:.1f}%)"),
+            font=dict(size=15), x=0.5, xanchor="center", y=0.99, yanchor="top"),
     )
+    fig.update_annotations(font_size=13)  # subplot titles
 
     out = Path(output_prefix)
     out.parent.mkdir(parents=True, exist_ok=True)
